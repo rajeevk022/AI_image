@@ -7,3 +7,6 @@ pymupdf
 openai
 requests
 openpyxl
+xlsxwriter
+fpdf
+seaborn
