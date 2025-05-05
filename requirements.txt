@@ -1,0 +1,8 @@
+streamlit
+pyrebase4
+python-dotenv
+pandas
+matplotlib
+pymupdf
+openai
+requests
