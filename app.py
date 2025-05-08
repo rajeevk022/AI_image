@@ -100,23 +100,54 @@ def export_pdf(insights, paths):
     return BytesIO(pdf.output(dest="S").encode("latin1"))
 
 # ─── 7. Razorpay popup (no blank screen) ────────────────────────
-def open_razorpay(email)->bool:
+def open_razorpay(email) -> bool:
+    """
+    Opens Razorpay Checkout in a new tab instead of the sandboxed iframe
+    to avoid blank‑line issues on Streamlit Cloud.
+    Returns True if the order JSON is created; False on error.
+    """
     if not (RZP_SERVER and RZP_KEY_ID):
         st.error("Payment server not configured."); return False
+
+    # 1. Create order on backend
     try:
-        r=requests.post(f"{RZP_SERVER}/create-order",json={"email":email},timeout=8)
-        r.raise_for_status(); order=r.json()
+        r = requests.post(f"{RZP_SERVER}/create-order",
+                          json={"email": email}, timeout=8)
+        r.raise_for_status()
+        order = r.json()
     except Exception as e:
-        st.error(f"Order‑server error: {e}"); return False
-    st.components.v1.html(f"""
-      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-      <script>
-        var o={{key:"{RZP_KEY_ID}",amount:"{order['amount']}",currency:"INR",
-        name:"AI Report Analyzer",description:"Pro Plan",order_id:"{order['id']}",
-        prefill:{{email:"{email}"}},theme:{{color:"#ff4f9d"}},
-        handler:function(){{window.location.reload();}}}};
-        new Razorpay(o).open();
-      </script>""",height=650,scrolling=False)
+        st.error(f"Order‑server error: {e}")
+        return False
+
+    # 2. Inject a <script> that opens Razorpay in a new tab
+    st.components.v1.html(
+        f"""
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+        <script>
+           var options = {{
+             key: "{RZP_KEY_ID}",
+             amount: "{order['amount']}",
+             currency: "INR",
+             name: "AI Report Analyzer",
+             description: "Pro Plan (₹299)",
+             order_id: "{order['id']}",
+             prefill: {{ email: "{email}" }},
+             theme: {{ color: "#ff4f9d" }},
+             handler: function () {{
+                 window.location.reload();   // reload Streamlit page after payment
+             }}
+           }};
+           var rzp = new Razorpay(options);
+           // OPEN IN NEW TAB
+           var win = window.open('', '_blank');
+           win.document.write('<html><head><title>Processing…</title></head><body></body></html>');
+           win.onload = function() {{
+               rzp.open({{ redirect: true, target: win }});  // open checkout in that tab
+           }};
+        </script>
+        """,
+        height=0,  # hidden; no need for iframe height now
+    )
     return True
 
 # ─── 8. Login screen ───────────────────────────────────────────
