@@ -116,7 +116,7 @@ def open_razorpay(email)->bool:
         prefill:{{email:"{email}"}},theme:{{color:"#ff4f9d"}},
         handler:function(){{window.location.reload();}}}};
         new Razorpay(o).open();
-      </script>""",height=1)
+      </script>""",height=650,scrolling=False)
     return True
 
 # ─── 8. Login screen ───────────────────────────────────────────
