@@ -1,12 +1,12 @@
 """
-AI Report Analyzer – FULL production build (May 2025)
-──────────────────────────────────────────────────────
-  • Free 3 reports → Razorpay Pro 300 — admin unlimited
-  • Pointer‑numbered insights
-  • Auto‑charts (≥2, ≤5) with seaborn styling
-  • Excel & PDF export (all insights + charts)
-  • Stable openai==0.28.1 syntax
-  • Fixed Razorpay blank‑screen (st.stop only on success)
+AI Report Analyzer – full production build (May 2025)
+-----------------------------------------------------
+• Freemium 3  →  Razorpay Pro 300  (admin unlimited)
+• Pointer‑numbered insights
+• ≥2 ≤5 charts  (hist, line, bar)  auto‑generated
+• Excel + PDF export  (insights + EVERY chart)
+• Razorpay Checkout opens inline (650 px iframe) – fixed blank‑line bug
+• openai==0.28.1 syntax
 """
 
 import os, tempfile, requests, streamlit as st
@@ -15,32 +15,36 @@ from io import BytesIO
 from dotenv import load_dotenv
 from firebase_config import firebase_config
 
-# ─── 1. ENV & CONSTANTS ──────────────────────────────────────────
+# ─── ENV & CONSTANTS ────────────────────────────────────────────
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
-RZP_SERVER     = os.getenv("RZP_SERVER")     # e.g. https://ai-image-1n31.onrender.com
-RZP_KEY_ID     = os.getenv("RZP_KEY_ID")     # rzp_test_xxx / rzp_live_xxx
-ADMIN_EMAIL    = "rajeevk021@gmail.com"
+
+RZP_SERVER  = os.getenv("RZP_SERVER")   # e.g. https://ai-image-1n31.onrender.com
+RZP_KEY_ID  = os.getenv("RZP_KEY_ID")   # rzp_test_xxx / rzp_live_xxx
+
+ADMIN_EMAIL      = "rajeevk021@gmail.com"
 FREE_LIMIT, PRO_LIMIT = 3, 300
 
-# ─── 2. Firebase init ───────────────────────────────────────────
+# ─── Firebase init ──────────────────────────────────────────────
 firebase = pyrebase.initialize_app(firebase_config)
 auth, db = firebase.auth(), firebase.database()
 
-# ─── 3. Streamlit look & feel ───────────────────────────────────
+# ─── Streamlit theming ──────────────────────────────────────────
 st.set_page_config("AI Report Analyzer", "📊", layout="wide")
-st.markdown(
-    "<style>html,body,[class*=css]{font-family:'Poppins',sans-serif;}"
-    ".stButton>button{background:linear-gradient(90deg,#ff4f9d,#ff77b1);border:none;"
-    "border-radius:24px;padding:10px 32px;color:#fff;font-weight:600;font-size:14px;}</style>",
-    unsafe_allow_html=True)
+st.markdown("""
+<style>
+html,body,[class*="css"]{font-family:'Poppins',sans-serif;}
+.stButton>button{background:linear-gradient(90deg,#ff4f9d,#ff77b1);border:none;
+border-radius:24px;padding:10px 32px;color:#fff;font-weight:600;}
+</style>
+""", unsafe_allow_html=True)
 
-# ─── 4. Session dict ────────────────────────────────────────────
+# ─── Session shortcut ───────────────────────────────────────────
 if "S" not in st.session_state:
     st.session_state.S = {"page":"login","insights":"","chart_paths":[],"df":pd.DataFrame()}
 S = st.session_state.S
 
-# ─── 5. Firebase helpers ────────────────────────────────────────
+# ─── Firebase helpers ───────────────────────────────────────────
 def load_user(email:str):
     if email == ADMIN_EMAIL:
         S.update(plan="admin", used=0, admin=True)
@@ -55,7 +59,7 @@ def inc_usage():
     db.child("users").child(key).update({"report_count": S["used"]+1})
     S["used"] += 1
 
-# ─── 6. Utility helpers ─────────────────────────────────────────
+# ─── Utility helpers ───────────────────────────────────────────
 def numberify(text:str)->str:
     lines=[l.strip() for l in text.splitlines() if l.strip()]
     return "\n".join(f"{i+1}. {l.lstrip('-*0123456789. ')}" for i,l in enumerate(lines))
@@ -64,18 +68,16 @@ def auto_charts(df):
     charts, paths = [], []
     num=df.select_dtypes("number").columns
     cat=df.select_dtypes("object").columns
-
-    if num.any():                                     # Histogram
+    if num.any():                                          # Histogram
         f,a=plt.subplots(); sns.histplot(df[num[0]].dropna(),ax=a,color="#ff78b3")
         a.set_title(f"Distribution of {num[0]}"); charts.append(("Histogram",f))
-    if len(num)>=2:                                   # Line / Scatter
+    if len(num)>=2:                                        # Line
         f,a=plt.subplots(); df.plot(x=num[0],y=num[1],ax=a,color="#ff78b3")
         a.set_title(f"{num[1]} vs {num[0]}"); charts.append(("Line chart",f))
-    if cat.any():                                     # Bar chart
+    if cat.any():                                          # Bar
         f,a=plt.subplots(); df[cat[0]].value_counts().head(10).plot(kind="bar",ax=a,color="#ff78b3")
         a.set_title(f"Top {cat[0]}"); charts.append(("Bar chart",f))
-
-    if len(charts)==1: charts.append(charts[0])       # guarantee ≥2
+    if len(charts)==1: charts.append(charts[0])            # ensure ≥2
     for _,fig in charts[:5]:
         p=tempfile.NamedTemporaryFile(delete=False,suffix=".png").name
         fig.savefig(p,dpi=220); paths.append(p)
@@ -99,63 +101,44 @@ def export_pdf(insights, paths):
     for p in paths: pdf.add_page(); pdf.image(p,x=10,y=30,w=180)
     return BytesIO(pdf.output(dest="S").encode("latin1"))
 
-# ─── 7. Razorpay popup (no blank screen) ────────────────────────
-def open_razorpay(email) -> bool:
-    """
-    Opens Razorpay Checkout in a new tab instead of the sandboxed iframe
-    to avoid blank‑line issues on Streamlit Cloud.
-    Returns True if the order JSON is created; False on error.
-    """
+# ─── Razorpay popup (inline 650 px) ────────────────────────────
+def open_razorpay(email)->bool:
     if not (RZP_SERVER and RZP_KEY_ID):
         st.error("Payment server not configured."); return False
-
-    # 1. Create order on backend
     try:
-        r = requests.post(f"{RZP_SERVER}/create-order",
-                          json={"email": email}, timeout=8)
-        r.raise_for_status()
-        order = r.json()
+        r=requests.post(f"{RZP_SERVER}/create-order",json={"email":email},timeout=8)
+        r.raise_for_status(); order=r.json()
     except Exception as e:
-        st.error(f"Order‑server error: {e}")
-        return False
-
-    # 2. Inject a <script> that opens Razorpay in a new tab
-    st.components.v1.html(
-        f"""
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-        <script>
-           var options = {{
-             key: "{RZP_KEY_ID}",
-             amount: "{order['amount']}",
-             currency: "INR",
-             name: "AI Report Analyzer",
-             description: "Pro Plan (₹299)",
-             order_id: "{order['id']}",
-             prefill: {{ email: "{email}" }},
-             theme: {{ color: "#ff4f9d" }},
-             handler: function () {{
-                 window.location.reload();   // reload Streamlit page after payment
-             }}
-           }};
-           var rzp = new Razorpay(options);
-           // OPEN IN NEW TAB
-           var win = window.open('', '_blank');
-           win.document.write('<html><head><title>Processing…</title></head><body></body></html>');
-           win.onload = function() {{
-               rzp.open({{ redirect: true, target: win }});  // open checkout in that tab
-           }};
-        </script>
-        """,
-        height=0,  # hidden; no need for iframe height now
-    )
+        st.error(f"Order‑server error: {e}"); return False
+    st.components.v1.html(f"""
+      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      <script>
+        var options = {{
+          key: "{RZP_KEY_ID}",
+          amount: "{order['amount']}",
+          currency: "INR",
+          name: "AI Report Analyzer",
+          description: "Pro Plan (₹299)",
+          order_id: "{order['id']}",
+          prefill: {{ email: "{email}" }},
+          theme: {{ color: "#ff4f9d" }},
+          handler: function () {{ window.location.reload(); }}
+        }};
+        var rzp = new Razorpay(options);
+        rzp.open();
+      </script>""", height=650, scrolling=False)
     return True
 
-# ─── 8. Login screen ───────────────────────────────────────────
+# ─── Login screen with image ───────────────────────────────────
+IMG_URL = "https://raw.githubusercontent.com/rajeevk022/AI_image/main/AI_image.png"
+
 def login_screen():
     st.title("AI Report Analyzer")
-    colL,colR=st.columns(2)
-    # Login
-    with colL:
+    left,right = st.columns([0.55,0.45])
+    with left:
+        st.image(IMG_URL, use_container_width=True)
+    with right:
+        st.markdown("### Login")
         email=st.text_input("Email").strip()
         pwd=st.text_input("Password",type="password")
         if st.button("Sign in"):
@@ -163,21 +146,20 @@ def login_screen():
                 auth.sign_in_with_email_and_password(email,pwd)
                 S.update(page="dash",email=email); load_user(email); st.rerun()
             except: st.error("Invalid credentials")
-    # Sign‑up
-    with colR:
-        email=st.text_input("New Email",key="su_em").strip()
-        pwd=st.text_input("New Password",type="password",key="su_pw")
+        st.markdown("---\n### Create Account")
+        new_email=st.text_input("New Email",key="su_em").strip()
+        new_pwd=st.text_input("New Password",type="password",key="su_pw")
         if st.button("Create account"):
             try:
-                auth.create_user_with_email_and_password(email,pwd)
-                db.child("users").child(email.replace(".","_")).set({"plan":"free","report_count":0})
+                auth.create_user_with_email_and_password(new_email,new_pwd)
+                db.child("users").child(new_email.replace(".","_")).set({"plan":"free","report_count":0})
                 st.success("Account created – log in.")
             except: st.error("Email exists")
 
-# ─── 9. Dashboard ──────────────────────────────────────────────
+# ─── Dashboard ────────────────────────────────────────────────
 def dashboard():
     admin=S.get("admin",False); plan=S.get("plan","free"); used=S.get("used",0)
-    sb=st.sidebar; sb.write(f"User: **{S['email']}**")
+    sb=st.sidebar; sb.write(f"**User:** {S['email']}")
     if admin: sb.success("Admin • Unlimited")
     elif plan=="free":
         sb.warning(f"Free • {FREE_LIMIT-used}/{FREE_LIMIT}")
@@ -192,19 +174,19 @@ def dashboard():
     st.title("Dashboard")
     up=st.file_uploader("Upload CSV / Excel / PDF",["csv","xlsx","pdf"])
     if not up:
-        if S["insights"]: results_view()
+        if S["insights"]: show_results()
         return
 
-    # PDF branch
+    # ── PDF branch
     if up.type.endswith("pdf"):
         text="\n".join(p.get_text() for p in fitz.open(stream=up.read(),filetype="pdf"))
         if not text.strip(): st.error("PDF contains no text."); return
-        with st.spinner("Summarising PDF …"):
+        with st.spinner("Analysing PDF …"):
             raw=openai.ChatCompletion.create(model="gpt-4o",
                 messages=[{"role":"user","content":text[:9000]}],max_tokens=800)["choices"][0]["message"]["content"]
-        S.update(insights=numberify(raw),chart_paths=[],df=pd.DataFrame()); results_view(); inc_usage(); return
+        S.update(insights=numberify(raw),chart_paths=[],df=pd.DataFrame()); show_results(); inc_usage(); return
 
-    # CSV / Excel branch
+    # ── CSV / Excel branch
     df=pd.read_csv(up) if up.name.endswith("csv") else pd.read_excel(up,engine="openpyxl")
     st.dataframe(df.head())
     if st.button("Generate Insights"):
@@ -213,20 +195,18 @@ def dashboard():
             raw=openai.ChatCompletion.create(model="gpt-4o",
                 messages=[{"role":"user","content":prompt}],max_tokens=700)["choices"][0]["message"]["content"]
         charts,paths=auto_charts(df)
-        S.update(insights=numberify(raw),chart_paths=paths,df=df); results_view(); inc_usage()
+        S.update(insights=numberify(raw),chart_paths=paths,df=df); show_results(); inc_usage()
 
-def results_view():
+def show_results():
     st.subheader("🔍 Insights"); st.write(S["insights"])
     if S["chart_paths"]:
         st.subheader("📊 Charts")
         for p in S["chart_paths"]: st.image(p,use_container_width=True)
     if not S["df"].empty:
-        st.download_button("Export as Excel",
-            export_excel(S["df"],S["insights"],S["chart_paths"]),
-            "ai_report.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    st.download_button("Export as PDF",
-        export_pdf(S["insights"],S["chart_paths"]), "ai_report.pdf")
+        st.download_button("Export as Excel", export_excel(S["df"],S["insights"],S["chart_paths"]),
+                           "ai_report.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.download_button("Export as PDF", export_pdf(S["insights"],S["chart_paths"]), "ai_report.pdf")
 
-# ─── 10. Router ────────────────────────────────────────────────
+# ─── Router ───────────────────────────────────────────────────
 if S["page"]=="login": login_screen()
 else: dashboard()
