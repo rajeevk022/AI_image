@@ -102,31 +102,58 @@ def export_pdf(insights, paths):
     return BytesIO(pdf.output(dest="S").encode("latin1"))
 
 # ─── Razorpay popup (inline 650 px) ────────────────────────────
-def open_razorpay(email)->bool:
+def open_razorpay(email) -> bool:
+    """Create order → open Razorpay Checkout. Handles cold‑start timeouts."""
     if not (RZP_SERVER and RZP_KEY_ID):
         st.error("Payment server not configured."); return False
+
+    # helper to call /create-order with retry
+    def create_order(timeout):
+        return requests.post(f"{RZP_SERVER}/create-order",
+                             json={"email": email}, timeout=timeout)
+
     try:
-        r=requests.post(f"{RZP_SERVER}/create-order",json={"email":email},timeout=8)
-        r.raise_for_status(); order=r.json()
+        resp = create_order(timeout=25)          # generous first call
+    except requests.Timeout:
+        # one quick retry (cold start usually finished by now)
+        time.sleep(1.5)
+        try:
+            resp = create_order(timeout=10)
+        except Exception as e:
+            st.error(f"Order‑server timeout: {e}")
+            return False
     except Exception as e:
-        st.error(f"Order‑server error: {e}"); return False
-    st.components.v1.html(f"""
-      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-      <script>
-        var options = {{
-          key: "{RZP_KEY_ID}",
-          amount: "{order['amount']}",
-          currency: "INR",
-          name: "AI Report Analyzer",
-          description: "Pro Plan (₹299)",
-          order_id: "{order['id']}",
-          prefill: {{ email: "{email}" }},
-          theme: {{ color: "#ff4f9d" }},
-          handler: function () {{ window.location.reload(); }}
-        }};
-        var rzp = new Razorpay(options);
-        rzp.open();
-      </script>""", height=650, scrolling=False)
+        st.error(f"Order‑server error: {e}")
+        return False
+
+    try:
+        order = resp.json()
+    except ValueError:
+        st.error("Order‑server returned non‑JSON response.")
+        return False
+
+    # Inject checkout (650 px iframe)
+    st.components.v1.html(
+        f"""
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+        <script>
+          var opt = {{
+            key: "{RZP_KEY_ID}",
+            amount: "{order['amount']}",
+            currency: "INR",
+            name: "AI Report Analyzer",
+            description: "Pro Plan (₹299)",
+            order_id: "{order['id']}",
+            prefill: {{ email: "{email}" }},
+            theme: {{ color: "#ff4f9d" }},
+            handler: function () {{ window.location.reload(); }}
+          }};
+          new Razorpay(opt).open();
+        </script>
+        """,
+        height=650,
+        scrolling=False,
+    )
     return True
 
 # ─── Login screen with image ───────────────────────────────────
