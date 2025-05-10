@@ -31,13 +31,22 @@ auth, db = firebase.auth(), firebase.database()
 
 # ─── Streamlit theming ──────────────────────────────────────────
 st.set_page_config("AI Report Analyzer", "📊", layout="wide")
-st.markdown("""
-<style>
-html,body,[class*="css"]{font-family:'Poppins',sans-serif;}
-.stButton>button{background:linear-gradient(90deg,#ff4f9d,#ff77b1);border:none;
-border-radius:24px;padding:10px 32px;color:#fff;font-weight:600;}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+        """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+    html,body,[class*='css']{font-family:'Poppins',sans-serif;}
+    body{background:linear-gradient(110deg,#fff4fa 0%,#ffffff 55%,#fff4fa 100%);}
+    h1{color:#d81b60;font-weight:700;text-align:center;margin:6px 0 2px;}
+    .tag{font-size:16px;color:#6f6f6f;text-align:center;margin:0 0 18px;font-style:italic;}
+    .login-img img{width:100%;height:420px;object-fit:cover;border-radius:18px;box-shadow:0 4px 18px rgba(216,27,96,.25);}
+    .auth-box{background:#fff;border-radius:18px;padding:36px 32px;box-shadow:0 4px 18px rgba(0,0,0,.1);}
+    .stTextInput>div>div>input{border:1.4px solid #d81b60;border-radius:10px;padding:11px;font-size:15px;}
+    .stButton>button{background:linear-gradient(90deg,#ff4f9d,#ff77b1);border:none;border-radius:24px;padding:10px 32px;
+                     color:#fff;font-weight:600;font-size:15px;box-shadow:0 3px 14px rgba(255,79,157,.35);}
+    .stButton>button:hover{background:linear-gradient(90deg,#e0438c,#ff5fa9);}
+    </style>
+    """, unsafe_allow_html=True)
 
 # ─── Session shortcut ───────────────────────────────────────────
 if "S" not in st.session_state:
