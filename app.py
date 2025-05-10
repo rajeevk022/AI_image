@@ -239,9 +239,18 @@ def show_results():
         st.subheader("📊 Charts")
         for p in S["chart_paths"]: st.image(p,use_container_width=True)
     if not S["df"].empty:
-        st.download_button("Export as Excel", export_excel(S["df"],S["insights"],S["chart_paths"]),
-                           "ai_report.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    st.download_button("Export as PDF", export_pdf(S["insights"],S["chart_paths"]), "ai_report.pdf")
+        st.download_button("📤 Export as Excel",
+                   data=export_excel(S["df"], S["insights"], S["chart_paths"]),
+                   file_name="ai_report.xlsx",
+                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                   key="export_excel_btn")
+
+st.download_button("📥 Export as PDF",
+                   data=export_pdf(S["insights"], S["chart_paths"]),
+                   file_name="ai_report.pdf",
+                   mime="application/pdf",
+                   key="export_pdf_btn")
+
 
 # ─── Router ───────────────────────────────────────────────────
 if S["page"]=="login": login_screen()
