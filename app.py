@@ -194,62 +194,109 @@ def login_screen():
 
 # ─── Dashboard ────────────────────────────────────────────────
 def dashboard():
-    admin=S.get("admin",False); plan=S.get("plan","free"); used=S.get("used",0)
-    sb=st.sidebar; sb.write(f"**User:** {S['email']}")
-    if admin: sb.success("Admin • Unlimited")
-    elif plan=="free":
-        sb.warning(f"Free • {FREE_LIMIT-used}/{FREE_LIMIT}")
-        if sb.button("Upgrade to Pro (₹299)") and open_razorpay(S["email"]):
-            st.stop()
-    else: sb.success(f"Pro • {used}/{PRO_LIMIT}")
-    if sb.button("Logout"): S["page"]="login"; st.rerun()
+    admin = S.get("admin", False)
+    plan = S.get("plan", "free")
+    used = S.get("used", 0)
 
-    if not admin and ((plan=="free" and used>=FREE_LIMIT) or (plan=="pro" and used>=PRO_LIMIT)):
-        st.error("Quota exceeded – upgrade or wait."); return
+    sb = st.sidebar
+    sb.write(f"**👤 User:** {S['email']}")
 
-    st.title("Dashboard")
-    up=st.file_uploader("Upload CSV / Excel / PDF",["csv","xlsx","pdf"])
-    if not up:
-        if S["insights"]: show_results()
+    # Show upgrade success message once
+    if S.get("just_upgraded"):
+        st.success("✅ You have successfully upgraded to Pro!")
+        S["just_upgraded"] = False
+
+    # Sidebar buttons
+    if sb.button("🏠 Home"):
+        st.rerun()
+
+    if admin:
+        sb.success("Admin • Unlimited")
+    elif plan == "free":
+        sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
+        if sb.button("💳 Upgrade to Pro (₹299)"):
+            if open_razorpay(S["email"]):
+                load_user(S["email"])
+                S["just_upgraded"] = True
+                st.rerun()
+    else:
+        sb.success(f"Pro • {used}/{PRO_LIMIT}")
+
+    if sb.button("🚪 Logout"):
+        S.clear()
+        S["page"] = "login"
+        st.rerun()
+
+    # Quota block for non-admins
+    if not admin and (
+        (plan == "free" and used >= FREE_LIMIT) or
+        (plan == "pro" and used >= PRO_LIMIT)
+    ):
+        st.error("Quota exceeded – upgrade to continue.")
         return
 
-    # ── PDF branch
-    if up.type.endswith("pdf"):
-        text="\n".join(p.get_text() for p in fitz.open(stream=up.read(),filetype="pdf"))
-        if not text.strip(): st.error("PDF contains no text."); return
-        with st.spinner("Analysing PDF …"):
-            raw=openai.ChatCompletion.create(model="gpt-4o",
-                messages=[{"role":"user","content":text[:9000]}],max_tokens=800)["choices"][0]["message"]["content"]
-        S.update(insights=numberify(raw),chart_paths=[],df=pd.DataFrame()); show_results(); inc_usage(); return
+    # Dashboard body
+    st.title("Dashboard")
+    up = st.file_uploader("Upload CSV / Excel / PDF", ["csv", "xlsx", "pdf"])
 
-    # ── CSV / Excel branch
-    df=pd.read_csv(up) if up.name.endswith("csv") else pd.read_excel(up,engine="openpyxl")
+    if not up:
+        if S.get("insights"): show_results()
+        return
+
+    # ── PDF Analysis ──
+    if up.type.endswith("pdf"):
+        text = "\n".join(p.get_text() for p in fitz.open(stream=up.read(), filetype="pdf"))
+        if not text.strip():
+            st.error("PDF appears to have no extractable text.")
+            return
+        with st.spinner("Analysing PDF …"):
+            raw = openai.ChatCompletion.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": text[:9000]}],
+                max_tokens=800
+            )["choices"][0]["message"]["content"]
+        S.update(insights=numberify(raw), chart_paths=[], df=pd.DataFrame())
+        show_results()
+        inc_usage()
+        return
+
+    # ── Excel/CSV Analysis ──
+    df = pd.read_csv(up) if up.name.endswith("csv") else pd.read_excel(up, engine="openpyxl")
     st.dataframe(df.head())
     if st.button("Generate Insights"):
-        prompt=f"Summarise:\n{df.head(15).to_csv(index=False)}"
+        prompt = f"Summarise:\n{df.head(15).to_csv(index=False)}"
         with st.spinner("Analysing …"):
-            raw=openai.ChatCompletion.create(model="gpt-4o",
-                messages=[{"role":"user","content":prompt}],max_tokens=700)["choices"][0]["message"]["content"]
-        charts,paths=auto_charts(df)
-        S.update(insights=numberify(raw),chart_paths=paths,df=df); show_results(); inc_usage()
+            raw = openai.ChatCompletion.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=700
+            )["choices"][0]["message"]["content"]
+        charts, paths = auto_charts(df)
+        S.update(insights=numberify(raw), chart_paths=paths, df=df)
+        show_results()
+        inc_usage()
 
 def show_results():
-    st.subheader("🔍 Insights"); st.write(S["insights"])
+    st.subheader("🔍 Insights")
+    st.write(S["insights"])
     if S["chart_paths"]:
         st.subheader("📊 Charts")
-        for p in S["chart_paths"]: st.image(p,use_container_width=True)
+        for p in S["chart_paths"]:
+            st.image(p, use_container_width=True)
+
     if not S["df"].empty:
         st.download_button("📤 Export as Excel",
-                   data=export_excel(S["df"], S["insights"], S["chart_paths"]),
-                   file_name="ai_report.xlsx",
-                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                   key="export_excel_btn")
+                           data=export_excel(S["df"], S["insights"], S["chart_paths"]),
+                           file_name="ai_report.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           key="export_excel_btn")
 
-st.download_button("📥 Export as PDF",
-                   data=export_pdf(S["insights"], S["chart_paths"]),
-                   file_name="ai_report.pdf",
-                   mime="application/pdf",
-                   key="export_pdf_btn")
+    st.download_button("📥 Export as PDF",
+                       data=export_pdf(S["insights"], S["chart_paths"]),
+                       file_name="ai_report.pdf",
+                       mime="application/pdf",
+                       key="export_pdf_btn")
+
 
 
 # ─── Router ───────────────────────────────────────────────────
