@@ -32,8 +32,15 @@ async def webhook(req: Request):
         razorpay.Utility.verify_webhook_signature(body, sig, WEBHOOK_SECRET)
     except razorpay.errors.SignatureVerificationError:
         raise HTTPException(400, "Bad signature")
+
     data = await req.json()
     if data["event"] == "payment.captured":
         email = data["payload"]["payment"]["entity"]["email"]
-        db.reference(f"users/{email.replace('.','_')}").update({"plan":"pro","report_count":0})
+        db.reference(f"users/{email.replace('.','_')}").update({
+            "plan": "pro",
+            "upgrade": True,
+            "report_count": 0
+        })
+
     return {"status": "ok"}
+
