@@ -232,8 +232,7 @@ def dashboard():
         if sb.button("💳 Upgrade to Pro (₹299)"):
               open_razorpay(S["email"])
               st.info("🕒 Please complete the payment. Once done, click 'Home' to refresh your status.")
-              st.stop()  
-        sb.success(f"Pro • {used}/{PRO_LIMIT}")
+              st.stop()
 
     if sb.button("🚪 Logout"):
         S.clear()
