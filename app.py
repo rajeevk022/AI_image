@@ -61,6 +61,8 @@ def load_user(email):
         key = email.replace(".", "_")
         rec = db.child("users").child(key).get().val() or {}
         plan = "pro" if rec.get("upgrade") else "free"
+        if rec.get("upgrade") and not S.get("upgrade"):
+                S["just_upgraded"] = True
         S.update(plan=plan,
                  used = int(rec.get("report_count") or 0),
                  admin=False,
