@@ -55,18 +55,34 @@ S = st.session_state.S
 
 # ─── Firebase helpers ───────────────────────────────────────────
 def load_user(email):
+    key = email.replace(".", "_")
+    rec = db.child("users").child(key).get().val() or {}
+
     if email == ADMIN_EMAIL:
         S.update(plan="admin", used=0, admin=True, upgrade=True)
     else:
-        key = email.replace(".", "_")
-        rec = db.child("users").child(key).get().val() or {}
         plan = "pro" if rec.get("upgrade") else "free"
-        if rec.get("upgrade") and not S.get("upgrade"):
-                S["just_upgraded"] = True
-        S.update(plan=plan,
-                 used = int(rec.get("report_count") or 0),
-                 admin=False,
-                 upgrade=rec.get("upgrade", False))
+        upgrade = rec.get("upgrade", False)
+        report_count = rec.get("report_count", 0)
+
+        # Force default values in DB if missing
+        if "report_count" not in rec:
+            db.child("users").child(key).update({"report_count": 0})
+        if "upgrade" not in rec:
+            db.child("users").child(key).update({"upgrade": False})
+        if "plan" not in rec:
+            db.child("users").child(key).update({"plan": "free"})
+
+        if upgrade and not S.get("upgrade"):
+            S["just_upgraded"] = True
+
+        S.update(
+            plan=plan,
+            used=int(report_count),
+            admin=False,
+            upgrade=upgrade
+        )
+
 
 
 
