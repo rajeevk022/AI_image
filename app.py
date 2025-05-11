@@ -62,7 +62,7 @@ def load_user(email):
         rec = db.child("users").child(key).get().val() or {}
         plan = "pro" if rec.get("upgrade") else "free"
         S.update(plan=plan,
-                 used=rec.get("report_count") or 0,
+                 used = int(rec.get("report_count") or 0),
                  admin=False,
                  upgrade=rec.get("upgrade", False))
 
@@ -223,8 +223,10 @@ def dashboard():
 
     if admin:
         sb.success("Admin • Unlimited")
+    elif plan == "pro":
+        sb.success("✅ Pro user – 50 reports per month")
     elif plan == "free":
-        sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
+        sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")  
         if sb.button("💳 Upgrade to Pro (₹299)"):
               open_razorpay(S["email"])
               st.info("🕒 Please complete the payment. Once done, click 'Home' to refresh your status.")
