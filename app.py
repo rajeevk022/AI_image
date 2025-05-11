@@ -64,6 +64,7 @@ def load_user(email):
         S.update(plan=plan, used=rec.get("report_count", 0), admin=False, upgrade=rec.get("upgrade", False))
 
 
+
 def inc_usage():
     if S.get("admin"): return
     key=S["email"].replace(".","_")
