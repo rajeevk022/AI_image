@@ -54,13 +54,15 @@ if "S" not in st.session_state:
 S = st.session_state.S
 
 # ─── Firebase helpers ───────────────────────────────────────────
-def load_user(email:str):
+def load_user(email):
     if email == ADMIN_EMAIL:
-        S.update(plan="admin", used=0, admin=True)
+        S.update(plan="admin", used=0, admin=True, upgrade=True)
     else:
-        key=email.replace(".","_")
-        rec=db.child("users").child(key).get().val() or {}
-        S.update(plan=rec.get("plan","free"), used=rec.get("report_count",0), admin=False)
+        key = email.replace(".", "_")
+        rec = db.child("users").child(key).get().val() or {}
+        plan = "pro" if rec.get("upgrade") else "free"
+        S.update(plan=plan, used=rec.get("report_count", 0), admin=False, upgrade=rec.get("upgrade", False))
+
 
 def inc_usage():
     if S.get("admin"): return
