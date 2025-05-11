@@ -23,8 +23,8 @@ RZP_SERVER  = os.getenv("RZP_SERVER")   # e.g. https://ai-image-1n31.onrender.co
 RZP_KEY_ID  = os.getenv("RZP_KEY_ID")   # rzp_test_xxx / rzp_live_xxx
 
 ADMIN_EMAIL      = "rajeevk021@gmail.com"
-FREE_LIMIT, PRO_LIMIT = 3, 300
-
+FREE_LIMIT  = 3
+PRO_LIMIT = 50
 # ─── Firebase init ──────────────────────────────────────────────
 firebase = pyrebase.initialize_app(firebase_config)
 auth, db = firebase.auth(), firebase.database()
