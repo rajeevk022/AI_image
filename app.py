@@ -83,6 +83,9 @@ def load_user(email):
             upgrade=upgrade
         )
 
+
+
+
 def inc_usage():
     if S.get("admin"): return
     key=S["email"].replace(".","_")
@@ -201,7 +204,9 @@ def login_screen():
         if st.button("Sign in"):
             try:
                 auth.sign_in_with_email_and_password(email,pwd)
-                S.update(page="dash",email=email); load_user(email); st.rerun()
+                load_user(email)
+                S.update(page="dash",email=email) 
+                st.rerun()
             except: st.error("Invalid credentials")
         st.markdown("---\n### Create Account")
         new_email=st.text_input("New Email",key="su_em").strip()
