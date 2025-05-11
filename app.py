@@ -190,7 +190,12 @@ def login_screen():
         if st.button("Create account"):
             try:
                 auth.create_user_with_email_and_password(new_email,new_pwd)
-                db.child("users").child(new_email.replace(".","_")).set({"plan":"free","report_count":0})
+                db.child("users").child(new_email.replace(".", "_")).set({
+                   "plan": "free",
+                   "report_count": 0,
+                   "upgrade": False
+                })
+
                 st.success("Account created – log in.")
             except: st.error("Email exists")
 
