@@ -194,34 +194,44 @@ IMG_URL = "https://raw.githubusercontent.com/rajeevk022/AI_image/main/AI_image.p
 
 def login_screen():
     st.title("AI Report Analyzer")
-    left,right = st.columns([0.55,0.45])
+    left, right = st.columns([0.55, 0.45])
+
     with left:
         st.image(IMG_URL, use_container_width=True)
+
     with right:
-        st.markdown("### Login")
-        email=st.text_input("Email").strip()
-        pwd=st.text_input("Password",type="password")
+        st.markdown("### 🔐 Login")
+        email = st.text_input("Email").strip()
+        pwd = st.text_input("Password", type="password")
+
         if st.button("Sign in"):
             try:
-                auth.sign_in_with_email_and_password(email,pwd)
+                user = auth.sign_in_with_email_and_password(email, pwd)
+                if "idToken" not in user:
+                    raise Exception("Missing token")
                 load_user(email)
-                S.update(page="dash",email=email) 
+                S.update(page="dash", email=email)
+                st.success("✅ Logged in successfully! Redirecting...")
+                time.sleep(0.5)
                 st.rerun()
-            except: st.error("Invalid credentials")
-        st.markdown("---\n### Create Account")
-        new_email=st.text_input("New Email",key="su_em").strip()
-        new_pwd=st.text_input("New Password",type="password",key="su_pw")
+            except Exception as e:
+                st.error("❌ Invalid credentials. Please try again.")
+
+        st.markdown("---\n### 📝 Create Account")
+        new_email = st.text_input("New Email", key="su_em").strip()
+        new_pwd = st.text_input("New Password", type="password", key="su_pw")
+
         if st.button("Create account"):
             try:
-                auth.create_user_with_email_and_password(new_email,new_pwd)
+                auth.create_user_with_email_and_password(new_email, new_pwd)
                 db.child("users").child(new_email.replace(".", "_")).set({
-                   "plan": "free",
-                   "report_count": 0,
-                   "upgrade": False
+                    "plan": "free",
+                    "report_count": 0,
+                    "upgrade": False
                 })
-
-                st.success("Account created – log in.")
-            except: st.error("Email exists")
+                st.success("✅ Account created! You can now log in.")
+            except:
+                st.error("❌ That email is already registered or invalid.")
 
 # ─── Dashboard ────────────────────────────────────────────────
 def dashboard():
