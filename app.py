@@ -201,6 +201,12 @@ def login_screen():
 
     with right:
         st.markdown("### 🔐 Login")
+
+        # Session state flags
+        if "login_attempted" not in S:
+            S["login_attempted"] = False
+            S["login_error"] = False
+
         email = st.text_input("Email").strip()
         pwd = st.text_input("Password", type="password")
 
@@ -210,14 +216,16 @@ def login_screen():
                 if "idToken" not in user:
                     raise Exception("Missing token")
                 load_user(email)
-                S.update(page="dash", email=email)
-                st.success("✅ Logged in successfully! Redirecting...")
+                S.update(page="dash", email=email, login_attempted=False, login_error=False)
                 time.sleep(0.5)
                 st.rerun()
-                st.stop()  # prevent any further execution
             except Exception as e:
-                st.error("❌ Invalid credentials. Please try again.")
-                st.stop()
+                S.update(login_attempted=True, login_error=True)
+                st.rerun()
+
+        if S["login_attempted"] and S["login_error"]:
+            st.error("❌ Invalid credentials. Please try again.")
+            S["login_attempted"] = False  # Reset after displaying
 
         st.markdown("---\n### 📝 Create Account")
         new_email = st.text_input("New Email", key="su_em").strip()
@@ -234,22 +242,6 @@ def login_screen():
                 st.success("✅ Account created! You can now log in.")
             except:
                 st.error("❌ That email is already registered or invalid.")
-        st.markdown("---\n### 📝 Create Account")
-        new_email = st.text_input("New Email", key="su_em").strip()
-        new_pwd = st.text_input("New Password", type="password", key="su_pw")
-
-        if st.button("Create account"):
-            try:
-                auth.create_user_with_email_and_password(new_email, new_pwd)
-                db.child("users").child(new_email.replace(".", "_")).set({
-                    "plan": "free",
-                    "report_count": 0,
-                    "upgrade": False
-                })
-                st.success("✅ Account created! You can now log in.")
-            except:
-                st.error("❌ That email is already registered or invalid.")
-
 # ─── Dashboard ────────────────────────────────────────────────
 def dashboard():
     admin = S.get("admin", False)
