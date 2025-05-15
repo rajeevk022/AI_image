@@ -214,9 +214,26 @@ def login_screen():
                 st.success("✅ Logged in successfully! Redirecting...")
                 time.sleep(0.5)
                 st.rerun()
+                st.stop()  # prevent any further execution
             except Exception as e:
                 st.error("❌ Invalid credentials. Please try again.")
+                st.stop()
 
+        st.markdown("---\n### 📝 Create Account")
+        new_email = st.text_input("New Email", key="su_em").strip()
+        new_pwd = st.text_input("New Password", type="password", key="su_pw")
+
+        if st.button("Create account"):
+            try:
+                auth.create_user_with_email_and_password(new_email, new_pwd)
+                db.child("users").child(new_email.replace(".", "_")).set({
+                    "plan": "free",
+                    "report_count": 0,
+                    "upgrade": False
+                })
+                st.success("✅ Account created! You can now log in.")
+            except:
+                st.error("❌ That email is already registered or invalid.")
         st.markdown("---\n### 📝 Create Account")
         new_email = st.text_input("New Email", key="su_em").strip()
         new_pwd = st.text_input("New Password", type="password", key="su_pw")
