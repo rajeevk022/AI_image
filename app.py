@@ -35,72 +35,103 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
 
-/* ——— GLOBAL & BACKGROUND ——— */
-html,body,[class*='css']{font-family:'Poppins',sans-serif;}
-body,.stApp{background:#fff0f6 !important;}
+/*--------------------------------------------------------------------
+  0.  FORCE LIGHT-MODE  (blocks macOS auto–dark conversion)
+--------------------------------------------------------------------*/
+:root, body, .stApp{
+  color-scheme: light;              /* tell Safari/Chrome we are light-only */
+  background:#fff0f6 !important;    /* solid feminine pink */
+  color:#444444;                    /* default text colour */
+  font-family:'Poppins',sans-serif;
+}
 
-/* ——— MAIN TITLE ——— */
+/*--------------------------------------------------------------------
+  1.  MAIN TITLE
+--------------------------------------------------------------------*/
 h1{
   color:#ff4f9d;
   font-weight:700;
   text-align:center;
   letter-spacing:0.6px;
-  text-shadow:
-    0 0 6px  #ff99c9,
-    0 0 12px #ff67b3,
-    0 0 18px #ff4f9d,
-    0 2px 4px rgba(255,79,157,.25);
+  text-shadow:0 0 6px  #ff99c9,
+               0 0 12px #ff67b3,
+               0 0 18px #ff4f9d,
+               0 2px 4px rgba(255,79,157,.25);
 }
 
-/* ——— INPUT BOXES ——— */
+/*--------------------------------------------------------------------
+  2.  INPUT BOXES
+--------------------------------------------------------------------*/
 .stTextInput>div>div>input{
   border:1.5px solid #ff77b1;
   border-radius:10px;
   padding:11px;
   font-size:15px;
+  background:#ffffff;               /* white even in dark-mode browsers */
+  color:#444444;
 }
 
-/* ——— GENERIC PINK BUTTONS ——— */
+/*--------------------------------------------------------------------
+  3.  GENERIC PINK BUTTONS
+--------------------------------------------------------------------*/
 .stButton>button{
   background:linear-gradient(90deg,#ff4f9d,#ff77b1);
   color:#ffffff;
-  border:none;border-radius:24px;padding:10px 32px;
-  font-weight:600;font-size:15px;
+  border:none;
+  border-radius:24px;
+  padding:10px 32px;
+  font-weight:600;
+  font-size:15px;
   box-shadow:0 3px 12px rgba(255,79,157,.35);
+  cursor:pointer;
 }
 .stButton>button:hover{
   background:linear-gradient(90deg,#e0438c,#ff5fa9);
 }
 
-/* ——— TAB LABELS (always pink) ——— */
+/*--------------------------------------------------------------------
+  4.  TAB LABELS  (always pink)
+--------------------------------------------------------------------*/
 div[data-baseweb="tab"] button{
-  color:#ff4f9d !important; font-weight:600;
+  color:#ff4f9d !important;
+  font-weight:600;
 }
 div[data-baseweb="tab"][aria-selected="true"] button{
-  color:#ff4f9d !important; font-weight:700;
+  color:#ff4f9d !important;
+  font-weight:700;
 }
-div[data-baseweb="tab-highlight"]{background:#ff4f9d !important;}
+div[data-baseweb="tab-highlight"]{
+  background:#ff4f9d !important;
+}
 
-/* ——— “Create account” button only ——— */
+/*--------------------------------------------------------------------
+  5.  “Create account” BUTTON (inside 2nd tab)
+--------------------------------------------------------------------*/
 div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button{
-  background:#ffffff !important;             /* white default */
+  background:#ffffff !important;    /* white default */
   color:#ff4f9d !important;
   border:2px solid #ff4f9d !important;
 }
 div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button:hover{
-  background:#ff4f9d !important;             /* pink on hover */
+  background:#ff4f9d !important;
   color:#ffffff !important;
 }
 
-/* ——— EXPANDER HEADERS & CONTENT ——— */
+/*--------------------------------------------------------------------
+  6.  EXPANDER HEADERS & CONTENT
+--------------------------------------------------------------------*/
 .streamlit-expanderHeader{
-  color:#ff4f9d !important; font-weight:600;
+  color:#ff4f9d !important;
+  font-weight:600;
 }
-.streamlit-expanderContent, .streamlit-expanderContent *{
-  color:#444444 !important;                  /* dark gray text inside */
+.streamlit-expanderContent,
+.streamlit-expanderContent *{
+  color:#444444 !important;          /* readable on pink bg */
 }
 
-/* ——— AUTH CARD (first tab panel wrapper) ——— */
+/*--------------------------------------------------------------------
+  7.  AUTH CARD  (first tab-panel wrapper)
+--------------------------------------------------------------------*/
 div[data-baseweb="tab-list"] ~ div{
   background:#ffffff;
   border-radius:18px;
@@ -109,6 +140,7 @@ div[data-baseweb="tab-list"] ~ div{
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # ─── Session shortcut ───────────────────────────────────────────
