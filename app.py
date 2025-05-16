@@ -69,37 +69,66 @@ h1{
   box-shadow:0 4px 20px rgba(0,0,0,.1);
 }
 
-/* Expander (details/summary) header text */
-details summary, .streamlit-expanderHeader {
-  color:#ff4f9d !important;          /* bright pink */
-  font-weight:600;
+/* —————————————————— GLOBAL / BACKGROUND —————————————————— */
+body, .stApp{background:#fff0f6 !important;}
+
+/* —————————————————— MAIN TITLE ———————————————————— */
+h1{
+  color:#ff4f9d; font-family:'Poppins',sans-serif; font-weight:700;
+  letter-spacing:0.6px; text-align:center;
+  text-shadow:0 0 6px #ff99c9,0 0 12px #ff67b3,0 0 18px #ff4f9d,
+              0 2px 4px rgba(255,79,157,.25);
 }
 
-/* Tab label buttons (BaseWeb tab component) */
-div[data-baseweb="tab"] button {
-  color:#ff4f9d !important;          /* bright pink */
-  font-weight:600;
+/* —————————————————— INPUTS & GENERIC BUTTONS ———————————— */
+.stTextInput>div>div>input{
+  border:1.5px solid #ff77b1;border-radius:10px;padding:11px;font-size:15px;
+}
+.stButton>button{
+  background:linear-gradient(90deg,#ff4f9d,#ff77b1);
+  border:none;border-radius:24px;padding:10px 32px;
+  color:#fff;font-weight:600;font-size:15px;
+  box-shadow:0 3px 12px rgba(255,79,157,.35);cursor:pointer;
+}
+.stButton>button:hover{
+  background:linear-gradient(90deg,#e0438c,#ff5fa9);
 }
 
-/* Active tab underline / highlight */
-div[data-baseweb="tab-highlight"] {
-  background:#ff4f9d !important;
+/* —————————————————— TAB LABELS (always pink) ———————————— */
+div[data-baseweb="tab"] button{
+  color:#ff4f9d !important;             /* unselected label */
+  font-weight:600;
 }
-/* ---------- 1.  CREATE-ACCOUNT button: pink text, white background ---------- */
-div[data-baseweb="tab-panel"] .stButton>button {
-  background:#ffffff !important;      /* white card-style */
-  color:#ff4f9d !important;           /* pink text  */
+div[data-baseweb="tab"][aria-selected="true"] button{
+  color:#ff4f9d !important;             /* selected label */
+  font-weight:700;
+}
+/* active tab underline */
+div[data-baseweb="tab-highlight"]{background:#ff4f9d !important;}
+
+/* —————————————————— “Create account” BUTTON (inside sign-up tab) ——— */
+div[data-baseweb="tab-panel"] .stButton>button{
+  background:#ffffff !important;        /* white default */
+  color:#ff4f9d !important;
   border:2px solid #ff4f9d !important;
 }
 div[data-baseweb="tab-panel"] .stButton>button:hover{
-  background:#ff4f9d !important;      /* fill pink on hover */
-  color:#ffffff !important;           /* white text on hover */
+  background:#ff4f9d !important;        /* pink on hover */
+  color:#ffffff !important;
 }
 
-/* ---------- 2.  Expander body text colour (readable on pink bg) ------------ */
-.streamlit-expanderContent, .streamlit-expanderContent * {
-  color:#444444 !important;           /* dark grey for paragraphs/lists */
+/* —————————————————— EXPANDER HEADERS & CONTENT ——————————— */
+.streamlit-expanderHeader{color:#ff4f9d !important;font-weight:600;}
+.streamlit-expanderContent, .streamlit-expanderContent *{
+  color:#444444 !important;             /* dark text for readability */
 }
+
+/* —————————————————— AUTH CARD STYLING ———————————————— */
+div[data-baseweb="tab-list"] ~ div{
+  background:#fff;border-radius:18px;padding:32px 28px;
+  box-shadow:0 4px 20px rgba(0,0,0,.1);
+}
+
 
 
 </style>
