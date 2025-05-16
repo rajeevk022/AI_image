@@ -37,7 +37,9 @@ st.markdown("""
 
 /* global */
 html,body,[class*='css']{font-family:'Poppins',sans-serif;}
-body{background:linear-gradient(110deg,#fff1f9 0%,#ffffff 55%,#fff1f9 100%);}
+body, .stApp {
+  background:#fff0f6 !important;
+}
 
 /* titles & buttons */
 h1{color:#d81b60;font-weight:700;text-align:center;margin:4px 0 14px;}
