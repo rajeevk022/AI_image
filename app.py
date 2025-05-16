@@ -217,6 +217,10 @@ def login_screen():
         tab_login, tab_signup = st.tabs(["🔐 Login", "📝 Create Account"])
 
         # -------- LOGIN TAB --------
+        if "login_attempted" not in S:
+            S["login_attempted"] = False
+            S["login_error"] = False
+        
         with tab_login:
             email = st.text_input("Email", key="login_email").strip()
             pwd   = st.text_input("Password", type="password", key="login_pwd")
@@ -227,13 +231,17 @@ def login_screen():
                     if "idToken" not in user:
                         raise Exception("token missing")
                     load_user(email)
-                    S.update(page="dash", email=email)
+                    S.update(page="dash", email=email,login_attempted=False, login_error=False)
                     st.success("✅ Logged in! Redirecting…")
                     time.sleep(0.5)
                     st.rerun()
-                except Exception:
+                except Exception as e:
                     st.error("❌ Invalid credentials. Please try again.")
-
+                    S.update(login_attempted=True, login_error=True)
+                    st.rerun()
+        if S["login_attempted"] and S["login_error"]:
+           st.error("❌ Invalid credentials. Please try again.")
+           S["login_attempted"] = False  # Reset after displaying
         # -------- SIGN-UP TAB -------
         with tab_signup:
             new_email = st.text_input("New Email", key="su_email").strip()
