@@ -68,6 +68,23 @@ h1{
   background:#fff;border-radius:18px;padding:32px 28px;
   box-shadow:0 4px 20px rgba(0,0,0,.1);
 }
+
+/* Expander (details/summary) header text */
+details summary, .streamlit-expanderHeader {
+  color:#ff4f9d !important;          /* bright pink */
+  font-weight:600;
+}
+
+/* Tab label buttons (BaseWeb tab component) */
+div[data-baseweb="tab"] button {
+  color:#ff4f9d !important;          /* bright pink */
+  font-weight:600;
+}
+
+/* Active tab underline / highlight */
+div[data-baseweb="tab-highlight"] {
+  background:#ff4f9d !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
