@@ -138,6 +138,10 @@ div[data-baseweb="tab-list"] ~ div{
   padding:32px 28px;
   box-shadow:0 4px 20px rgba(0,0,0,.1);
 }
+
+div[data-baseweb="tab"]:hover button{
+  color:#ff4f9d !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
