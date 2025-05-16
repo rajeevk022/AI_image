@@ -242,6 +242,49 @@ def login_screen():
                 st.success("✅ Account created! You can now log in.")
             except:
                 st.error("❌ That email is already registered or invalid.")
+                
+        st.markdown("---")
+
+        # Terms of Service
+        with st.expander("📜 Terms of Service"):
+            st.markdown("""
+### Terms of Service – **AnalytiGlow**
+
+1. **License & Usage** – Non-exclusive, non-transferable use of AI Report Analyzer for personal or business reporting. You may not resell or reverse-engineer the platform.  
+2. **Intellectual Property** – All trademarks, logos, and code remain the property of AnalytiGlow. Uploaded data belongs to you.  
+3. **Account Security** – Keep credentials confidential; you are responsible for account activity.  
+4. **Fair-Use Limits** – Free plan = 3 reports / month • Pro plan = 50 reports / month. Automated scraping or abuse is prohibited.  
+5. **Payments & Renewals** – Subscriptions billed in INR via Razorpay; pricing subject to change with notice.  
+6. **Service Availability** – We target 99 % uptime; maintenance windows may occur.  
+7. **Termination** – Accounts violating terms may be suspended without refund.  
+8. **Changes** – Terms may change; continued use constitutes acceptance.
+""")
+
+        # Privacy Policy
+        with st.expander("🔐 Privacy Policy"):
+            st.markdown("""
+### Privacy Policy – **AnalytiGlow**  
+
+**What we collect** – Email, login auth token, and usage counts. IP address is logged for security.  
+**How we use it** – Authenticate plans (Free / Pro), improve features, and email critical updates.  
+**Storage & Security** – Firebase Auth manages credentials; uploads are processed in-memory and never stored. All traffic is HTTPS-encrypted.  
+**Third Parties** – Razorpay (payments) and OpenAI (AI inference) each have their own privacy terms.  
+**Cookies** – A single session cookie keeps you logged in; no tracking cookies.  
+**Your rights** – Email **rajeevk021@gmail.com** to access or delete your data.  
+**Location** – AnalytiGlow, Bangalore, India.  
+**Updates** – Policy revisions take effect on posting; major changes are emailed to users.
+""")
+
+        # Refund Policy
+        with st.expander("💸 Refund Policy"):
+            st.markdown("""
+### Refund Policy – **AnalytiGlow**
+
+* **Eligibility** – Full refund within **10 days** of first-time purchase of the ₹299/month Pro plan.  
+* **Request** – Email **rajeevk021@gmail.com** with registered email & payment ID.  
+* **Processing** – Refund issued to original payment method within **5–7 business days** once approved.  
+* **Exclusions** – No refunds after 10 days, for renewals, or for accounts terminated for policy violations.
+""")
 # ─── Dashboard ────────────────────────────────────────────────
 def dashboard():
     admin = S.get("admin", False)
