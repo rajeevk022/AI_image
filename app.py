@@ -42,7 +42,13 @@ body, .stApp {
 }
 
 /* titles & buttons */
-h1{color:#d81b60;font-weight:700;text-align:center;margin:4px 0 14px;}
+h1 {
+  color:#ff4f9d;            /* bright pink */
+  font-family:'Poppins',sans-serif;
+  font-weight:700;
+  letter-spacing:0.5px;
+  text-shadow:0 2px 4px rgba(255,79,157,.25);
+}
 .stButton>button{
   background:linear-gradient(90deg,#ff4f9d,#ff77b1);
   border:none;border-radius:24px;padding:10px 32px;color:#fff;font-weight:600;font-size:15px;
@@ -214,7 +220,7 @@ def login_screen():
 
     # -- Right auth card --
     with right:
-        st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
+        # st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
 
         tab_login, tab_signup = st.tabs(["🔐 Login", "📝 Create Account"])
 
@@ -258,7 +264,7 @@ def login_screen():
                 except:
                     st.error("⚠️ Email already registered or invalid.")
 
-        st.markdown("</div>", unsafe_allow_html=True)  # close .auth-box
+        #st.markdown("</div>", unsafe_allow_html=True)  # close .auth-box
 
     # ---- Horizontal Policies row ----
     st.markdown("<br>", unsafe_allow_html=True)
