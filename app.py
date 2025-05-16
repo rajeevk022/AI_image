@@ -290,7 +290,7 @@ We may update pricing or terms with notice.
 We collect only email & usage metrics.  
 Uploads processed in-memory, never stored.  
 Third parties: Razorpay (payments) & OpenAI (inference).  
-Contact **rajeevk021@gmail.com** • Bangalore, India.
+Contact **rajeevk021@gmail.com** • Hulimavu Bangalore - 560076, India.
 """)
 
     with c3:
