@@ -85,6 +85,23 @@ div[data-baseweb="tab"] button {
 div[data-baseweb="tab-highlight"] {
   background:#ff4f9d !important;
 }
+/* ---------- 1.  CREATE-ACCOUNT button: pink text, white background ---------- */
+div[data-baseweb="tab-panel"] .stButton>button {
+  background:#ffffff !important;      /* white card-style */
+  color:#ff4f9d !important;           /* pink text  */
+  border:2px solid #ff4f9d !important;
+}
+div[data-baseweb="tab-panel"] .stButton>button:hover{
+  background:#ff4f9d !important;      /* fill pink on hover */
+  color:#ffffff !important;           /* white text on hover */
+}
+
+/* ---------- 2.  Expander body text colour (readable on pink bg) ------------ */
+.streamlit-expanderContent, .streamlit-expanderContent * {
+  color:#444444 !important;           /* dark grey for paragraphs/lists */
+}
+
+
 </style>
 """, unsafe_allow_html=True)
 
