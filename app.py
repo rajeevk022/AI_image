@@ -35,102 +35,78 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
 
-/* global */
+/* ——— GLOBAL & BACKGROUND ——— */
 html,body,[class*='css']{font-family:'Poppins',sans-serif;}
-body, .stApp {
-  background:#fff0f6 !important;
-}
+body,.stApp{background:#fff0f6 !important;}
 
-/* titles & buttons */
+/* ——— MAIN TITLE ——— */
 h1{
-  color:#ff4f9d;                     /* Nykaa pink */
-  font-family:'Poppins',sans-serif;
+  color:#ff4f9d;
   font-weight:700;
+  text-align:center;
   letter-spacing:0.6px;
-  text-align:center;                 /* ensure centred */
-  /* multi-layer glow */
   text-shadow:
-    0 0 6px   #ff99c9,
-    0 0 12px  #ff67b3,
-    0 0 18px  #ff4f9d,
+    0 0 6px  #ff99c9,
+    0 0 12px #ff67b3,
+    0 0 18px #ff4f9d,
     0 2px 4px rgba(255,79,157,.25);
 }
-.stButton>button{
-  background:linear-gradient(90deg,#ff4f9d,#ff77b1);
-  border:none;border-radius:24px;padding:10px 32px;color:#fff;font-weight:600;font-size:15px;
-  box-shadow:0 3px 12px rgba(255,79,157,.35);cursor:pointer;
-}
-.stButton>button:hover{background:linear-gradient(90deg,#e0438c,#ff5fa9);}
-.stTextInput>div>div>input{border:1.5px solid #ff77b1;border-radius:10px;padding:11px;font-size:15px;}
 
-/* auth box */
-.auth-box{
-  background:#fff;border-radius:18px;padding:32px 28px;
-  box-shadow:0 4px 20px rgba(0,0,0,.1);
-}
-
-/* —————————————————— GLOBAL / BACKGROUND —————————————————— */
-body, .stApp{background:#fff0f6 !important;}
-
-/* —————————————————— MAIN TITLE ———————————————————— */
-h1{
-  color:#ff4f9d; font-family:'Poppins',sans-serif; font-weight:700;
-  letter-spacing:0.6px; text-align:center;
-  text-shadow:0 0 6px #ff99c9,0 0 12px #ff67b3,0 0 18px #ff4f9d,
-              0 2px 4px rgba(255,79,157,.25);
-}
-
-/* —————————————————— INPUTS & GENERIC BUTTONS ———————————— */
+/* ——— INPUT BOXES ——— */
 .stTextInput>div>div>input{
-  border:1.5px solid #ff77b1;border-radius:10px;padding:11px;font-size:15px;
+  border:1.5px solid #ff77b1;
+  border-radius:10px;
+  padding:11px;
+  font-size:15px;
 }
+
+/* ——— GENERIC PINK BUTTONS ——— */
 .stButton>button{
   background:linear-gradient(90deg,#ff4f9d,#ff77b1);
+  color:#ffffff;
   border:none;border-radius:24px;padding:10px 32px;
-  color:#fff;font-weight:600;font-size:15px;
-  box-shadow:0 3px 12px rgba(255,79,157,.35);cursor:pointer;
+  font-weight:600;font-size:15px;
+  box-shadow:0 3px 12px rgba(255,79,157,.35);
 }
 .stButton>button:hover{
   background:linear-gradient(90deg,#e0438c,#ff5fa9);
 }
 
-/* —————————————————— TAB LABELS (always pink) ———————————— */
+/* ——— TAB LABELS (always pink) ——— */
 div[data-baseweb="tab"] button{
-  color:#ff4f9d !important;             /* unselected label */
-  font-weight:600;
+  color:#ff4f9d !important; font-weight:600;
 }
 div[data-baseweb="tab"][aria-selected="true"] button{
-  color:#ff4f9d !important;             /* selected label */
-  font-weight:700;
+  color:#ff4f9d !important; font-weight:700;
 }
-/* active tab underline */
 div[data-baseweb="tab-highlight"]{background:#ff4f9d !important;}
 
-/* —————————————————— “Create account” BUTTON (inside sign-up tab) ——— */
-div[data-baseweb="tab-panel"] .stButton>button{
-  background:#ffffff !important;        /* white default */
+/* ——— “Create account” button only ——— */
+div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button{
+  background:#ffffff !important;             /* white default */
   color:#ff4f9d !important;
   border:2px solid #ff4f9d !important;
 }
-div[data-baseweb="tab-panel"] .stButton>button:hover{
-  background:#ff4f9d !important;        /* pink on hover */
+div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button:hover{
+  background:#ff4f9d !important;             /* pink on hover */
   color:#ffffff !important;
 }
 
-/* —————————————————— EXPANDER HEADERS & CONTENT ——————————— */
-.streamlit-expanderHeader{color:#ff4f9d !important;font-weight:600;}
+/* ——— EXPANDER HEADERS & CONTENT ——— */
+.streamlit-expanderHeader{
+  color:#ff4f9d !important; font-weight:600;
+}
 .streamlit-expanderContent, .streamlit-expanderContent *{
-  color:#444444 !important;             /* dark text for readability */
+  color:#444444 !important;                  /* dark gray text inside */
 }
 
-/* —————————————————— AUTH CARD STYLING ———————————————— */
+/* ——— AUTH CARD (first tab panel wrapper) ——— */
 div[data-baseweb="tab-list"] ~ div{
-  background:#fff;border-radius:18px;padding:32px 28px;
+  background:#ffffff;
+  border-radius:18px;
+  padding:32px 28px;
   box-shadow:0 4px 20px rgba(0,0,0,.1);
 }
-
-
-
 </style>
 """, unsafe_allow_html=True)
 
