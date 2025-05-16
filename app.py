@@ -42,12 +42,18 @@ body, .stApp {
 }
 
 /* titles & buttons */
-h1 {
-  color:#ff4f9d;            /* bright pink */
+h1{
+  color:#ff4f9d;                     /* Nykaa pink */
   font-family:'Poppins',sans-serif;
   font-weight:700;
-  letter-spacing:0.5px;
-  text-shadow:0 2px 4px rgba(255,79,157,.25);
+  letter-spacing:0.6px;
+  text-align:center;                 /* ensure centred */
+  /* multi-layer glow */
+  text-shadow:
+    0 0 6px   #ff99c9,
+    0 0 12px  #ff67b3,
+    0 0 18px  #ff4f9d,
+    0 2px 4px rgba(255,79,157,.25);
 }
 .stButton>button{
   background:linear-gradient(90deg,#ff4f9d,#ff77b1);
