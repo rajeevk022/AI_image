@@ -200,100 +200,83 @@ def open_razorpay(email) -> bool:
     return True
 
 # ─── Login screen with image ───────────────────────────────────
-IMG_URL = "https://raw.githubusercontent.com/rajeevk022/AI_image/main/AI_image.png"
-
 def login_screen():
     st.title("AI Report Analyzer")
-    left, right = st.columns([0.55, 0.45])
 
+    left, right = st.columns([0.55, 0.45], gap="large")
+
+    # -- Left hero image --
+    IMG_URL = "https://raw.githubusercontent.com/rajeevk022/AI_image/main/AI_image.png"
     with left:
         st.image(IMG_URL, use_container_width=True)
 
+    # -- Right auth card --
     with right:
-        st.markdown("### 🔐 Login")
+        st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
 
-        # Session state flags
-        if "login_attempted" not in S:
-            S["login_attempted"] = False
-            S["login_error"] = False
+        tab_login, tab_signup = st.tabs(["🔐 Login", "📝 Create Account"])
 
-        email = st.text_input("Email").strip()
-        pwd = st.text_input("Password", type="password")
+        # -------- LOGIN TAB --------
+        with tab_login:
+            email = st.text_input("Email", key="login_email").strip()
+            pwd   = st.text_input("Password", type="password", key="login_pwd")
 
-        if st.button("Sign in"):
-            try:
-                user = auth.sign_in_with_email_and_password(email, pwd)
-                if "idToken" not in user:
-                    raise Exception("Missing token")
-                load_user(email)
-                S.update(page="dash", email=email, login_attempted=False, login_error=False)
-                time.sleep(0.5)
-                st.rerun()
-            except Exception as e:
-                S.update(login_attempted=True, login_error=True)
-                st.rerun()
+            if st.button("Sign in", key="signin_btn"):
+                try:
+                    user = auth.sign_in_with_email_and_password(email, pwd)
+                    if "idToken" not in user:
+                        raise Exception("token missing")
+                    load_user(email)
+                    S.update(page="dash", email=email)
+                    st.success("✅ Logged in! Redirecting…")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception:
+                    st.error("❌ Invalid credentials. Please try again.")
 
-        if S["login_attempted"] and S["login_error"]:
-            st.error("❌ Invalid credentials. Please try again.")
-            S["login_attempted"] = False  # Reset after displaying
+        # -------- SIGN-UP TAB -------
+        with tab_signup:
+            new_email = st.text_input("New Email", key="su_email").strip()
+            new_pwd   = st.text_input("New Password", type="password", key="su_pwd")
 
-        st.markdown("---\n### 📝 Create Account")
-        new_email = st.text_input("New Email", key="su_em").strip()
-        new_pwd = st.text_input("New Password", type="password", key="su_pw")
+            if st.button("Create account", key="su_btn"):
+                try:
+                    auth.create_user_with_email_and_password(new_email, new_pwd)
+                    db.child("users").child(new_email.replace(".","_")).set({
+                        "plan":"free","report_count":0,"upgrade":False})
+                    st.success("✅ Account created! You can now log in.")
+                except:
+                    st.error("⚠️ Email already registered or invalid.")
 
-        if st.button("Create account"):
-            try:
-                auth.create_user_with_email_and_password(new_email, new_pwd)
-                db.child("users").child(new_email.replace(".", "_")).set({
-                    "plan": "free",
-                    "report_count": 0,
-                    "upgrade": False
-                })
-                st.success("✅ Account created! You can now log in.")
-            except:
-                st.error("❌ That email is already registered or invalid.")
-                
-        st.markdown("---")
+        st.markdown("</div>", unsafe_allow_html=True)  # close .auth-box
 
-        # Terms of Service
+    # ---- Horizontal Policies row ----
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
         with st.expander("📜 Terms of Service"):
             st.markdown("""
-### Terms of Service – **AnalytiGlow**
-
-1. **License & Usage** – Non-exclusive, non-transferable use of AI Report Analyzer for personal or business reporting. You may not resell or reverse-engineer the platform.  
-2. **Intellectual Property** – All trademarks, logos, and code remain the property of AnalytiGlow. Uploaded data belongs to you.  
-3. **Account Security** – Keep credentials confidential; you are responsible for account activity.  
-4. **Fair-Use Limits** – Free plan = 3 reports / month • Pro plan = 50 reports / month. Automated scraping or abuse is prohibited.  
-5. **Payments & Renewals** – Subscriptions billed in INR via Razorpay; pricing subject to change with notice.  
-6. **Service Availability** – We target 99 % uptime; maintenance windows may occur.  
-7. **Termination** – Accounts violating terms may be suspended without refund.  
-8. **Changes** – Terms may change; continued use constitutes acceptance.
+**AnalytiGlow** grants a non-transferable licence for personal or business use of AI Report Analyzer.  
+Fair-use: Free 3 / month • Pro 50 / month. Abuse or reverse-engineering is prohibited.  
+We may update pricing or terms with notice.
 """)
 
-        # Privacy Policy
+    with c2:
         with st.expander("🔐 Privacy Policy"):
             st.markdown("""
-### Privacy Policy – **AnalytiGlow**  
-
-**What we collect** – Email, login auth token, and usage counts. IP address is logged for security.  
-**How we use it** – Authenticate plans (Free / Pro), improve features, and email critical updates.  
-**Storage & Security** – Firebase Auth manages credentials; uploads are processed in-memory and never stored. All traffic is HTTPS-encrypted.  
-**Third Parties** – Razorpay (payments) and OpenAI (AI inference) each have their own privacy terms.  
-**Cookies** – A single session cookie keeps you logged in; no tracking cookies.  
-**Your rights** – Email **rajeevk021@gmail.com** to access or delete your data.  
-**Location** – AnalytiGlow, Bangalore, India.  
-**Updates** – Policy revisions take effect on posting; major changes are emailed to users.
+We collect only email & usage metrics.  
+Uploads processed in-memory, never stored.  
+Third parties: Razorpay (payments) & OpenAI (inference).  
+Contact **rajeevk021@gmail.com** • Bangalore, India.
 """)
 
-        # Refund Policy
+    with c3:
         with st.expander("💸 Refund Policy"):
             st.markdown("""
-### Refund Policy – **AnalytiGlow**
-
-* **Eligibility** – Full refund within **10 days** of first-time purchase of the ₹299/month Pro plan.  
-* **Request** – Email **rajeevk021@gmail.com** with registered email & payment ID.  
-* **Processing** – Refund issued to original payment method within **5–7 business days** once approved.  
-* **Exclusions** – No refunds after 10 days, for renewals, or for accounts terminated for policy violations.
+Full refund within **10 days** of first Pro purchase (₹299/mo).  
+Email **rajeevk021@gmail.com** with payment ID.  
+Refund issued in 5-7 business days. No refunds after 10 days or on renewals.
 """)
 # ─── Dashboard ────────────────────────────────────────────────
 def dashboard():
