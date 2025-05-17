@@ -214,6 +214,16 @@ def auto_charts(df):
         p=tempfile.NamedTemporaryFile(delete=False,suffix=".png").name
         fig.savefig(p,dpi=220); paths.append(p)
     return charts[:5], paths
+# ------------------------------------------------------------------
+#  Add this helper near your other utilities (e.g. after numberify)
+# ------------------------------------------------------------------
+def to_latin1(text: str) -> str:
+    """
+    Convert Unicode → Latin-1, replacing unsupported glyphs with '?'.
+    Prevents UnicodeEncodeError in classic PyFPDF.
+    """
+    return text.encode("latin-1", "replace").decode("latin-1")
+
 
 def export_excel(df, insights, paths):
     bio=BytesIO()
@@ -225,13 +235,34 @@ def export_excel(df, insights, paths):
         for p in paths: ws.insert_image(row,0,p,{"x_scale":0.9,"y_scale":0.9}); row+=22
     bio.seek(0); return bio
 
+
+
+# ------------------------------------------------------------------
+#  Replace your entire existing export_pdf() with this version
+# ------------------------------------------------------------------
 def export_pdf(insights, paths):
+    """
+    Build a PDF that holds pointer-numbered insights + chart images.
+    Ensures all text is Latin-1 safe for PyFPDF.
+    """
     from fpdf import FPDF
-    pdf=FPDF(); pdf.set_auto_page_break(True,15)
-    pdf.add_page(); pdf.set_font("Arial",size=11)
-    [pdf.multi_cell(0,8,l) for l in insights.splitlines()]
-    for p in paths: pdf.add_page(); pdf.image(p,x=10,y=30,w=180)
-    return BytesIO(pdf.output(dest="S").encode("latin1"))
+    pdf = FPDF()
+    pdf.set_auto_page_break(True, 15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=11)
+
+    # write insights, line by line, after coercing to Latin-1
+    for line in insights.splitlines():
+        pdf.multi_cell(0, 8, to_latin1(line))
+
+    # add each chart image on its own page
+    for p in paths:
+        pdf.add_page()
+        pdf.image(p, x=10, y=30, w=180)
+
+    # return as BytesIO for Streamlit download
+    return BytesIO(pdf.output(dest="S").encode("latin-1"))
+
 
 # ─── Razorpay popup (inline 650 px) ────────────────────────────
 def open_razorpay(email) -> bool:
