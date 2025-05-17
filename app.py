@@ -141,6 +141,12 @@ div[data-baseweb="tab-list"] ~ div{
 
 div[data-baseweb="tab"]:hover button{
   color:#ff4f9d !important;
+
+div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button{
+  background:linear-gradient(90deg,#ff4f9d,#ff77b1) !important;
+  color:#ffffff !important;
+  border:none !important;
+}  
 }
 </style>
 """, unsafe_allow_html=True)
