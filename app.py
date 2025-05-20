@@ -159,7 +159,7 @@ if "S" not in st.session_state:
 S = st.session_state.S
 
 # ─── Firebase helpers ───────────────────────────────────────────
-def load_user(email):
+''' def load_user(email):
     key = email.replace(".", "_")
     rec = db.child("users").child(key).get().val() or {}
 
@@ -186,9 +186,37 @@ def load_user(email):
             used=int(report_count),
             admin=False,
             upgrade=upgrade
-        )
+        )'''
 
+def load_user(email):
+    key = email.replace(".", "_")
+    rec = db.child("users").child(key).get().val() or {}
+    now = int(datetime.now(tz=timezone.utc).timestamp())
 
+    # ── Admin bypass ──
+    if email == ADMIN_EMAIL:
+        S.update(plan="admin", used=0, admin=True, upgrade=True)
+        return
+
+    # ── Check Pro expiry ──
+    is_pro      = rec.get("upgrade", False)
+    valid_until = rec.get("pro_valid_until", 0)
+
+    if is_pro and valid_until < now:
+        # Pro expired → downgrade
+        rec.update({"upgrade": False,
+                    "plan":    "free",
+                    "report_count": 0})
+        db.child("users").child(key).update(rec)
+        is_pro = False
+
+    plan  = "pro" if is_pro else "free"
+    used  = int(rec.get("report_count", 0))
+
+    if is_pro and not S.get("upgrade"):
+        S["just_upgraded"] = True
+
+    S.update(plan=plan, used=used, admin=False, upgrade=is_pro)
 
 
 def inc_usage():
