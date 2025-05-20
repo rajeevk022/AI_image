@@ -221,9 +221,10 @@ def load_user(email):
 
 def inc_usage():
     if S.get("admin"): return
-    key=S["email"].replace(".","_")
-    db.child("users").child(key).update({"report_count": S["used"]+1})
-    S["used"] += 1
+    key = S["email"].replace(".","_")
+    new_used = S["used"] + 1
+    db.child("users").child(key).update({"report_count": new_used})
+    S["used"] = new_used
 
 # ─── Utility helpers ───────────────────────────────────────────
 def numberify(text:str)->str:
@@ -461,7 +462,8 @@ def dashboard():
     if admin:
         sb.success("Admin • Unlimited")
     elif plan == "pro":
-        sb.success("✅ Pro user – 50 reports per month")
+        remaining = max(0, PRO_LIMIT - used)
+        sb.success(f"✅ Pro • {remaining}/{PRO_LIMIT} reports left")
     elif plan == "free":
         sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")  
         if sb.button("💳 Upgrade to Pro (₹299)"):
