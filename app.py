@@ -348,27 +348,41 @@ def login_screen():
             S["login_attempted"] = False
             S["login_error"] = False
         
-        with tab_login:
-            email = st.text_input("Email", key="login_email").strip()
-            pwd   = st.text_input("Password", type="password", key="login_pwd")
+   with tab_login:
+    email = st.text_input("Email", key="login_email").strip()
+    pwd   = st.text_input("Password", type="password", key="login_pwd")
 
-            if st.button("Sign in", key="signin_btn"):
-                try:
-                    user = auth.sign_in_with_email_and_password(email, pwd)
-                    if "idToken" not in user:
-                        raise Exception("token missing")
-                    load_user(email)
-                    S.update(page="dash", email=email,login_attempted=False, login_error=False)
-                    st.success("✅ Logged in! Redirecting…")
-                    time.sleep(0.5)
-                    st.rerun()
-                except Exception as e:
-                    st.error("❌ Invalid credentials. Please try again.")
-                    S.update(login_attempted=True, login_error=True)
-                    st.rerun()
-        if S["login_attempted"] and S["login_error"]:
-           st.error("❌ Invalid credentials. Please try again.")
-           S["login_attempted"] = False  # Reset after displaying
+    if st.button("Sign in", key="signin_btn"):
+        # ---------- ① Firebase authentication ----------
+        try:
+            user = auth.sign_in_with_email_and_password(email, pwd)
+            if "idToken" not in user:          # sanity-check token
+                raise ValueError("token missing")
+        except Exception:
+            st.error("❌ Invalid email or password.")
+            S.update(login_attempted=True, login_error=True)
+            st.stop()
+
+        # ---------- ② Load plan / quota from Realtime DB ----------
+        try:
+            load_user(email)
+        except Exception as e:
+            import traceback, sys
+            traceback.print_exc(file=sys.stderr)
+            st.error("Login succeeded, but we couldn’t fetch your plan data. "
+                     "Please retry or contact support.")
+            st.stop()
+
+        # ---------- ③ Success ----------
+        S.update(page="dash", email=email, login_attempted=False, login_error=False)
+        st.success("✅ Logged in! Redirecting…")
+        time.sleep(0.5)
+        st.rerun()
+
+# (optional) keep your previous one-time flag display if still needed
+if S.get("login_attempted") and S.get("login_error"):
+    st.error("❌ Invalid email or password.")
+    S["login_attempted"] = False
         # -------- SIGN-UP TAB -------
         with tab_signup:
             new_email = st.text_input("New Email", key="su_email").strip()
