@@ -348,7 +348,7 @@ def login_screen():
             S["login_attempted"] = False
             S["login_error"] = False
         
-   with tab_login:
+with tab_login:
     email = st.text_input("Email", key="login_email").strip()
     pwd   = st.text_input("Password", type="password", key="login_pwd")
 
@@ -383,6 +383,7 @@ def login_screen():
 if S.get("login_attempted") and S.get("login_error"):
     st.error("❌ Invalid email or password.")
     S["login_attempted"] = False
+
         # -------- SIGN-UP TAB -------
         with tab_signup:
             new_email = st.text_input("New Email", key="su_email").strip()
