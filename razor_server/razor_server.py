@@ -34,13 +34,20 @@ async def webhook(req: Request):
         raise HTTPException(400, "Bad signature")
 
     data = await req.json()
-    if data["event"] == "payment.captured":
-        email = data["payload"]["payment"]["entity"]["email"]
-        db.reference(f"users/{email.replace('.','_')}").update({
-            "plan": "pro",
-            "upgrade": True,
-            "report_count": 0
-        })
 
-    return {"status": "ok"}
+    # We care only about successful capture events
+    if data.get("event") == "payment.captured":
+        pay   = data["payload"]["payment"]["entity"]
+        status = pay.get("status")
+        email  = pay.get("email")
+        if status == "captured" and email:
+            key = email.replace(".", "_")
+            valid_until = int(time.time() + 30*24*3600)     # +30 days
+            db.reference(f"users/{key}").update({
+                "plan":            "pro",
+                "upgrade":         True,
+                "report_count":    0,
+                "pro_valid_until": valid_until
+            })
+    return {"ok": True}
 
