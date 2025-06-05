@@ -92,12 +92,11 @@ if "S" not in st.session_state:
     }
 S = st.session_state.S
 # ────────────────────────────────────────────────────────────────────────
-def load_user(email):
-    key = email.replace(".", "_")
-    rec = db.child("users").child(key).get().val() or {}
+def load_user(uid):
+    rec = db.child("users").child(uid).get().val() or {}
     now = int(datetime.now(tz=timezone.utc).timestamp())
 
-    if email == ADMIN_EMAIL:
+    if S.get("email") == ADMIN_EMAIL:
         S.update(plan="admin", used=0, admin=True, upgrade=True)
         return
 
@@ -106,7 +105,7 @@ def load_user(email):
 
     if is_pro and valid_until < now:                     # expired -> downgrade
         rec.update({"upgrade": False, "plan": "free", "report_count": 0})
-        db.child("users").child(key).update(rec)
+        db.child("users").child(uid).update(rec)
         is_pro = False
 
     plan = "pro" if is_pro else "free"
@@ -120,7 +119,7 @@ def load_user(email):
 def inc_usage():
     if S.get("admin"):
         return
-    key = S["email"].replace(".", "_")
+    key = S.get("uid")
     new_used = S["used"] + 1
     db.child("users").child(key).update({"report_count": new_used})
     S["used"] = new_used
@@ -254,7 +253,8 @@ def login_screen():
                 # ① Auth
                 try:
                     user = auth.sign_in_with_email_and_password(email, pwd)
-                    if "idToken" not in user:
+                    uid = user.get("localId")
+                    if not (uid and "idToken" in user):
                         raise ValueError("token missing")
                 except Exception:
                     st.error("❌ Invalid email or password.")
@@ -262,7 +262,7 @@ def login_screen():
 
                 # ② Load plan
                 try:
-                    load_user(email)
+                    load_user(uid)
                 except Exception as e:
                     import traceback, sys
 
@@ -274,7 +274,7 @@ def login_screen():
                     st.stop()
 
                 # ③ Success
-                S.update(page="dash", email=email)
+                S.update(page="dash", email=email, uid=uid)
                 st.success("✅ Logged in! Redirecting…")
                 time.sleep(0.5)
                 st.rerun()
@@ -286,9 +286,15 @@ def login_screen():
 
             if st.button("Create account", key="su_btn"):
                 try:
-                    auth.create_user_with_email_and_password(new_email, new_pwd)
-                    db.child("users").child(new_email.replace(".", "_")).set(
-                        {"plan": "free", "report_count": 0, "upgrade": False}
+                    user = auth.create_user_with_email_and_password(new_email, new_pwd)
+                    uid = user.get("localId")
+                    db.child("users").child(uid).set(
+                        {
+                            "email": new_email,
+                            "plan": "free",
+                            "report_count": 0,
+                            "upgrade": False,
+                        }
                     )
                     st.success("✅ Account created! You can now log in.")
                 except Exception:

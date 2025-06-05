@@ -1,6 +1,6 @@
-import os, razorpay
+import os, razorpay, time
 from fastapi import FastAPI, Request, HTTPException
-from firebase_admin import credentials, initialize_app, db
+from firebase_admin import credentials, initialize_app, db, auth
 
 # ① Replace PROJECT-ID with your Firebase project ID
 initialize_app(credentials.ApplicationDefault(),
@@ -41,9 +41,9 @@ async def webhook(req: Request):
         status = pay.get("status")
         email  = pay.get("email")
         if status == "captured" and email:
-            key = email.replace(".", "_")
+            uid = auth.get_user_by_email(email).uid
             valid_until = int(time.time() + 30*24*3600)     # +30 days
-            db.reference(f"users/{key}").update({
+            db.reference(f"users/{uid}").update({
                 "plan":            "pro",
                 "upgrade":         True,
                 "report_count":    0,
