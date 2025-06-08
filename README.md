@@ -48,3 +48,8 @@ their own record. Use the UID based path created by the application:
 ```
 
 This ensures user data is accessible only to the authenticated account.
+
+The application saves the Firebase `idToken` returned at login and passes it to
+every database read or write. If you adapt the code, make sure each
+`db.child(...).get(token)` or `update(data, token)` call includes this token, or
+the security rules above will reject the request.
