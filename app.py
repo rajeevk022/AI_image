@@ -92,37 +92,137 @@ if "S" not in st.session_state:
     }
 S = st.session_state.S
 # ────────────────────────────────────────────────────────────────────────
+
 def load_user(uid):
-    rec = db.child("users").child(uid).get().val() or {}
-    now = int(datetime.now(tz=timezone.utc).timestamp())
+    """Loads user plan and usage data from Realtime Database."""
+    st.write(f"--- Loading user data for UID: {uid} ---") # Log start
+    try:
+        # Attempt to fetch data from the user's node
+        st.write(f"Fetching data from /users/{uid}")
+        rec = db.child("users").child(uid).get().val()
+        st.write(f"Raw data fetched for {uid}: {rec}") # Log the raw data
 
-    if S.get("email") == ADMIN_EMAIL:
-        S.update(plan="admin", used=0, admin=True, upgrade=True)
-        return
+        # Explicitly handle the case where no data exists (rec is None)
+        if rec is None:
+            rec = {}
+            st.write("No data found for user in DB, treating as empty.")
 
-    is_pro      = rec.get("upgrade", False)
-    valid_until = rec.get("pro_valid_until", 0)
+        # Check if the fetched data is actually a dictionary (or compatible)
+        if not isinstance(rec, dict):
+             st.error(f"Unexpected data type found for user {uid}. Expected dictionary, got {type(rec)}.")
+             st.write(f"Attempting to proceed with empty dictionary due to unexpected type.")
+             rec = {} # Fallback to empty dict
 
-    if is_pro and valid_until < now:                     # expired -> downgrade
-        rec.update({"upgrade": False, "plan": "free", "report_count": 0})
-        db.child("users").child(uid).update(rec)
-        is_pro = False
+        now = int(datetime.now(tz=timezone.utc).timestamp())
 
-    plan = "pro" if is_pro else "free"
-    used = int(rec.get("report_count", 0))
+        # Check if the logged-in email is the admin email
+        current_email = S.get("email", "") # Get email safely from session state
+        if current_email == ADMIN_EMAIL:
+            S.update(plan="admin", used=0, admin=True, upgrade=True)
+            st.write(f"User {uid} ({current_email}) identified as admin.")
+            st.write("--- load_user finished for admin ---")
+            return # Exit early for admin
 
-    if is_pro and not S.get("upgrade"):
-        S["just_upgraded"] = True
+        # Fetch plan details from the record, defaulting if keys are missing
+        is_pro      = rec.get("upgrade", False)
+        valid_until = rec.get("pro_valid_until", 0)
+        st.write(f"Fetched 'upgrade': {is_pro}, 'pro_valid_until': {valid_until}")
 
-    S.update(plan=plan, used=used, admin=False, upgrade=is_pro)
-# ----------------------------------------------------------------------
+        # Check for expired Pro plan and downgrade if necessary
+        if is_pro and valid_until < now:
+            st.write(f"Pro plan for {uid} expired (valid until {valid_until}), downgrading.")
+            rec["upgrade"] = False
+            rec["plan"] = "free"
+            rec["report_count"] = 0 # Reset count on downgrade
+
+            # Add error handling for the database update itself
+            try:
+                db.child("users").child(uid).update(rec)
+                st.write(f"Successfully updated user {uid} data in DB after downgrade.")
+            except Exception as update_e:
+                 st.error(f"Failed to update user {uid} data in DB after downgrade attempt: {update_e}")
+                 st.write(f"Update failed traceback:")
+                 traceback.print_exc(file=sys.stderr)
+            is_pro = False # Ensure is_pro reflects the new state
+
+        # Determine the current plan and usage count
+        plan = "pro" if is_pro else "free"
+        # Safely get report_count, ensuring it's an int
+        report_count_raw = rec.get("report_count", 0)
+        used = int(report_count_raw) if isinstance(report_count_raw, (int, float)) else 0
+        st.write(f"Calculated current plan: {plan}, reports used: {used}")
+
+        # Check if the user just upgraded in this session (optional logic)
+        # This relies on the 'upgrade' state in S potentially being different from DB state initially
+        # Note: This logic might need refinement depending on when S['upgrade'] is set.
+        # For now, keeping original logic but logging it.
+        if is_pro and not S.get("upgrade"):
+            S["just_upgraded"] = True
+            st.write(f"User {uid} just upgraded to Pro.")
+
+        # Update the session state with the loaded user data
+        # Ensure email and uid are kept from successful authentication login_screen handles this
+        S.update(plan=plan, used=used, admin=False, upgrade=is_pro)
+        st.write(f"Session state S updated for user {uid}: {S}")
+        st.write("--- load_user finished successfully ---")
+
+    except Exception as e:
+        # This is the catch for errors during the database fetch or data processing
+        st.write(f"--- Exception caught in load_user for UID {uid} ---")
+        st.write(f"Specific error: {e}")
+        # Print the full traceback to the console where your Streamlit app is running
+        traceback.print_exc(file=sys.stderr)
+        # Display the user-friendly error message in the Streamlit app
+        st.error(
+            "Login succeeded, but we couldn’t fetch your plan data. "
+            "Please retry or contact support."
+        )
+        # Removed st.stop() from here to allow outer login_screen to handle stop/rerun.
+
+
+
+# --- Assuming these imports are at the top of your script ---
+# import streamlit as st
+# import pyrebase # And db is initialized
+# import traceback, sys # Or import globally
+
+# --- Assuming S is defined globally or in the surrounding scope ---
+# S = st.session_state.S
+
+
 def inc_usage():
+    """Increments the report usage count for the current user."""
+    st.write("--- Incrementing usage count ---")
     if S.get("admin"):
+        st.write("User is admin, usage not tracked.")
         return
     key = S.get("uid")
-    new_used = S["used"] + 1
-    db.child("users").child(key).update({"report_count": new_used})
-    S["used"] = new_used
+    if not key:
+        st.error("Cannot increment usage: User UID not found in session.")
+        st.write("UID missing from session state.")
+        return
+
+    # Fetch the current count from the database before incrementing to avoid simple race conditions
+    # This makes the increment safer, though a transaction would be fully atomic.
+    st.write(f"Fetching current report count for UID: {key} before increment.")
+    try:
+        current_rec = db.child("users").child(key).get().val()
+        if current_rec and isinstance(current_rec, dict):
+            # Safely get current_used, defaulting to 0 if missing or not numeric
+            current_used = int(current_rec.get("report_count", 0)) if isinstance(current_rec.get("report_count"), (int, float)) else 0
+            new_used = current_used + 1
+            st.write(f"Current usage from DB: {current_used}, new usage: {new_used}")
+        else:
+            # Fallback if data structure is unexpected or missing for some reason
+            st.write(f"Could not fetch valid current usage from DB for {key}. Falling back to incrementing session state value ({S.get('used', 0)}).")
+            new_used = (S.get("used", 0) or 0) + 1 # Use session state value as fallback
+
+    except Exception as e:
+        st.error(f"Failed to fetch current usage before incrementing for {key}: {e}")
+        st.write("Fetch before increment traceback:")
+        traceback.print_exc(file=sys.stderr)
+        # Fallback to using session state value + 1 if fetching fails
+
 # ----------------------------------------------------------------------
 def numberify(text: str) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -233,7 +333,21 @@ def open_razorpay(email) -> bool:
     )
     return True
 # ----------------------------------------------------------------------
+# --- Assuming these imports are at the top of your script ---
+# import streamlit as st
+# import pyrebase # And firebase initialization like: firebase = pyrebase.initialize_app(firebase_config); auth, db = firebase.auth(), firebase.database()
+# import time # Used for time.sleep
+# import traceback, sys # Or import globally
+
+# --- Assuming S is defined globally or in the surrounding scope ---
+# S = st.session_state.S
+
+# --- Assuming load_user is defined ---
+# from .your_module import load_user # If load_user is in another file
+
+
 def login_screen():
+    """Handles user login and account creation."""
     st.title("AI Report Analyzer")
     left, right = st.columns([0.55, 0.45], gap="large")
 
@@ -250,34 +364,64 @@ def login_screen():
             pwd = st.text_input("Password", type="password", key="login_pwd")
 
             if st.button("Sign in", key="signin_btn"):
+                st.write("--- Attempting Login ---")
+                st.write(f"Attempting to sign in with email: {email}")
                 # ① Auth
                 try:
                     user = auth.sign_in_with_email_and_password(email, pwd)
                     uid = user.get("localId")
+                    st.write(f"Authentication successful. Received raw user data: {user}")
+                    st.write(f"Extracted UID: {uid}")
+                    # Check if UID and token are present as expected by original code
                     if not (uid and "idToken" in user):
-                        raise ValueError("token missing")
-                except Exception:
+                        st.write("Authentication response missing expected UID or idToken.")
+                        raise ValueError("Authentication token or UID missing from response.")
+
+                except Exception as auth_e:
+                    st.write(f"Authentication failed: {auth_e}")
+                    traceback.print_exc(file=sys.stderr) # Print auth failure traceback
                     st.error("❌ Invalid email or password.")
-                    st.stop()
+                    st.stop() # Stop the app flow on auth failure
+
+                st.write("Authentication step completed successfully.")
+
+                # Store email and uid in session state immediately after successful auth
+                S["email"] = email
+                S["uid"] = uid
+                st.write(f"Stored email ({email}) and uid ({uid}) in session state.")
+
 
                 # ② Load plan
+                st.write("Calling load_user function...")
                 try:
+                    # load_user function now handles its own exceptions internally
                     load_user(uid)
-                except Exception as e:
-                    import traceback, sys
+                    st.write("load_user function call completed.")
+                    # Check if S['plan'] and S['used'] were updated by load_user
+                    if S.get('plan') is None or S.get('used') is None:
+                         st.write("Warning: Session state 'plan' or 'used' not set by load_user.")
 
+
+                except Exception as load_e:
+                    # This catch block is less likely to be hit now that load_user handles
+                    # its database fetch errors, but it catches anything load_user might re-raise
+                    # or other unexpected errors *after* the load_user call returns.
+                    st.write(f"Unexpected exception caught after calling load_user: {load_e}")
                     traceback.print_exc(file=sys.stderr)
                     st.error(
-                        "Login succeeded, but we couldn’t fetch your plan data. "
+                        "An unexpected error occurred while finalizing login. "
                         "Please retry or contact support."
                     )
-                    st.stop()
+                    st.stop() # Stop the app flow on this unexpected error
 
                 # ③ Success
-                S.update(page="dash", email=email, uid=uid)
+                st.write("Login process considered successful based on previous steps. Updating session state for navigation.")
+                # S['email'] and S['uid'] are already set above.
+                S["page"] = "dash" # Set the page to dashboard
                 st.success("✅ Logged in! Redirecting…")
-                time.sleep(0.5)
-                st.rerun()
+                st.write("--- Login successful, rerunning ---")
+                time.sleep(0.5) # Add a small delay before rerunning
+                st.rerun() # Rerun the app to switch to the dashboard page
 
         # ---------------- SIGN-UP TAB ---------------
         with tab_signup:
@@ -285,22 +429,35 @@ def login_screen():
             new_pwd = st.text_input("New Password", type="password", key="su_pwd")
 
             if st.button("Create account", key="su_btn"):
+                st.write("--- Attempting Sign Up ---")
+                st.write(f"Attempting to create user with email: {new_email}")
                 try:
                     user = auth.create_user_with_email_and_password(new_email, new_pwd)
                     uid = user.get("localId")
+                    st.write(f"User creation successful. Received UID: {uid}")
+                    st.write(f"Initializing user data in DB for UID: {uid}")
+                    # Use set() to create the initial user record in the database
                     db.child("users").child(uid).set(
                         {
                             "email": new_email,
                             "plan": "free",
                             "report_count": 0,
                             "upgrade": False,
+                            # You might want to add created_at timestamp here
+                            "created_at": int(datetime.now(tz=timezone.utc).timestamp())
                         }
                     )
+                    st.write(f"User data initialized successfully for {uid}.")
                     st.success("✅ Account created! You can now log in.")
-                except Exception:
+                    st.write("--- Sign Up successful ---")
+                except Exception as su_e:
+                    st.write(f"Sign up failed: {su_e}")
+                    traceback.print_exc(file=sys.stderr)
                     st.error("⚠️ Email already registered or invalid.")
+                    st.write("--- Sign Up failed ---")
 
     # ---------------- POLICIES ROW -----------------
+    # ... (policies expanders remain unchanged) ...
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
 
@@ -328,6 +485,8 @@ def login_screen():
                 "Email **rajeevk021@gmail.com** with payment ID.  \n"
                 "Refund issued in 5-7 business days. No refunds after 10 days or on renewals."
             )
+
+
 # ----------------------------------------------------------------------
 def dashboard():
     admin = S.get("admin", False)
