@@ -60,7 +60,7 @@ h1{
 }
 .stButton>button:hover{background:linear-gradient(90deg,#e0438c,#ff5fa9);}
 
-div[data-baseweb="tab"]        button{color:#ff4f9d !important;font-weight:600;}
+div[data-baseweb="tab"]        button{color:#000 !important;font-weight:600;}
 div[data-baseweb="tab"][aria-selected="true"] button{font-weight:700;}
 div[data-baseweb="tab-highlight"]{background:#ff4f9d !important;}
 div[data-baseweb="tab"]:hover   button{color:#ff4f9d !important;}
@@ -70,6 +70,15 @@ div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button{
 }
 div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button:hover{
   background:linear-gradient(90deg,#ff4f9d,#ff77b1) !important;color:#fff !important;
+}
+
+label[data-testid="stFileUploaderLabel"] span{
+  color:#007bff !important;font-weight:600;
+}
+
+.stDownloadButton>button,
+.stDownloadButton>a{
+  color:#007bff !important;
 }
 
 .streamlit-expanderHeader{color:#ff4f9d !important;font-weight:600;}
