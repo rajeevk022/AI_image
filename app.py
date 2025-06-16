@@ -10,6 +10,7 @@ AI Report Analyzer – full production build (May 2025)
 
 import os, time, tempfile, requests, streamlit as st
 import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, fitz, openai, pyrebase
+import traceback, sys
 from io import BytesIO
 from dotenv import load_dotenv
 from datetime import datetime, timezone   # ← missing import added
@@ -99,7 +100,8 @@ def load_user(uid):
     try:
         # Attempt to fetch data from the user's node
         st.write(f"Fetching data from /users/{uid}")
-        rec = db.child("users").child(uid).get().val()
+        token = S.get("token")
+        rec = db.child("users").child(uid).get(token).val()
         st.write(f"Raw data fetched for {uid}: {rec}") # Log the raw data
 
         # Explicitly handle the case where no data exists (rec is None)
@@ -137,7 +139,7 @@ def load_user(uid):
 
             # Add error handling for the database update itself
             try:
-                db.child("users").child(uid).update(rec)
+                db.child("users").child(uid).update(rec, token)
                 st.write(f"Successfully updated user {uid} data in DB after downgrade.")
             except Exception as update_e:
                  st.error(f"Failed to update user {uid} data in DB after downgrade attempt: {update_e}")
@@ -206,7 +208,8 @@ def inc_usage():
     # This makes the increment safer, though a transaction would be fully atomic.
     st.write(f"Fetching current report count for UID: {key} before increment.")
     try:
-        current_rec = db.child("users").child(key).get().val()
+        token = S.get("token")
+        current_rec = db.child("users").child(key).get(token).val()
         if current_rec and isinstance(current_rec, dict):
             # Safely get current_used, defaulting to 0 if missing or not numeric
             current_used = int(current_rec.get("report_count", 0)) if isinstance(current_rec.get("report_count"), (int, float)) else 0
@@ -222,6 +225,16 @@ def inc_usage():
         st.write("Fetch before increment traceback:")
         traceback.print_exc(file=sys.stderr)
         # Fallback to using session state value + 1 if fetching fails
+        new_used = (S.get("used", 0) or 0) + 1
+
+    # Update the value back to the database
+    try:
+        db.child("users").child(key).update({"report_count": new_used}, token)
+    except Exception as upd_e:
+        st.error(f"Failed to update usage for {key}: {upd_e}")
+        traceback.print_exc(file=sys.stderr)
+
+    S["used"] = new_used
 
 # ----------------------------------------------------------------------
 def numberify(text: str) -> str:
@@ -370,6 +383,7 @@ def login_screen():
                 try:
                     user = auth.sign_in_with_email_and_password(email, pwd)
                     uid = user.get("localId")
+                    token = user.get("idToken")
                     st.write(f"Authentication successful. Received raw user data: {user}")
                     st.write(f"Extracted UID: {uid}")
                     # Check if UID and token are present as expected by original code
@@ -388,6 +402,7 @@ def login_screen():
                 # Store email and uid in session state immediately after successful auth
                 S["email"] = email
                 S["uid"] = uid
+                S["token"] = token
                 st.write(f"Stored email ({email}) and uid ({uid}) in session state.")
 
 
@@ -434,6 +449,7 @@ def login_screen():
                 try:
                     user = auth.create_user_with_email_and_password(new_email, new_pwd)
                     uid = user.get("localId")
+                    token = user.get("idToken")
                     st.write(f"User creation successful. Received UID: {uid}")
                     st.write(f"Initializing user data in DB for UID: {uid}")
                     # Use set() to create the initial user record in the database
@@ -445,7 +461,8 @@ def login_screen():
                             "upgrade": False,
                             # You might want to add created_at timestamp here
                             "created_at": int(datetime.now(tz=timezone.utc).timestamp())
-                        }
+                        },
+                        token
                     )
                     st.write(f"User data initialized successfully for {uid}.")
                     st.success("✅ Account created! You can now log in.")
