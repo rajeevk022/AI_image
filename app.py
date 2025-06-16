@@ -60,8 +60,15 @@ h1{
 }
 .stButton>button:hover{background:linear-gradient(90deg,#e0438c,#ff5fa9);}
 
-div[data-baseweb="tab"]        button{color:#ff4f9d !important;font-weight:600;}
-div[data-baseweb="tab"][aria-selected="true"] button{font-weight:700;}
+/* Always blue text for download buttons */
+.stDownloadButton>button{color:#0066ff !important;}
+.stDownloadButton>button:hover{color:#0066ff !important;}
+
+/* Blue label for file uploader */
+[data-testid="stFileUploader"] label{color:#0066ff !important;}
+
+div[data-baseweb="tab"]        button{color:#000 !important;font-weight:600;}
+div[data-baseweb="tab"][aria-selected="true"] button{color:#ff4f9d !important;font-weight:700;}
 div[data-baseweb="tab-highlight"]{background:#ff4f9d !important;}
 div[data-baseweb="tab"]:hover   button{color:#ff4f9d !important;}
 
