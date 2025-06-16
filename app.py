@@ -86,6 +86,14 @@ div[data-baseweb="tab-list"]~div{
   background:#fff;border-radius:18px;padding:32px 28px;
   box-shadow:0 4px 20px rgba(0,0,0,.1);
 }
+
+/* Neon blue styling for specific login texts */
+div[data-baseweb="tab"]:nth-of-type(1) button span,
+div[data-baseweb="tab"]:nth-of-type(2) button span,
+div[data-baseweb="tab-panel"]:nth-of-type(1) label{
+  color:#00bfff !important;
+  text-shadow:0 0 6px #00bfff;
+}
 </style>
 """,
     unsafe_allow_html=True,
