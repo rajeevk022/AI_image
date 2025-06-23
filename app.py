@@ -67,10 +67,17 @@ h1{
 /* Blue label for file uploader */
 [data-testid="stFileUploader"] label{color:#0066ff !important;}
 
-div[data-baseweb="tab"]        button{color:#000 !important;font-weight:600;}
+div[data-baseweb="tab"]        button{color:#000;font-weight:600;}
 div[data-baseweb="tab"][aria-selected="true"] button{color:#ff4f9d !important;font-weight:700;}
 div[data-baseweb="tab-highlight"]{background:#ff4f9d !important;}
 div[data-baseweb="tab"]:hover   button{color:#ff4f9d !important;}
+
+div[data-baseweb="tab-panel"]:nth-of-type(1) .stButton>button{
+  background:#9b59b6 !important;color:#fff !important;
+}
+div[data-baseweb="tab-panel"]:nth-of-type(1) .stButton>button:hover{
+  background:#8e44ad !important;
+}
 
 div[data-baseweb="tab-panel"]:nth-of-type(2) .stButton>button{
   background:#fff !important;color:#ff4f9d !important;border:2px solid #ff4f9d;
