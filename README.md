@@ -1,5 +1,8 @@
 # AI Report Analyzer
 
+## Features
+- Supports CSV and Excel files with up to **50k rows** for insight generation.
+
 ## Environment Variables
 
 Set the following variables before starting the app:
