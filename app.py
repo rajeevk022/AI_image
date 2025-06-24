@@ -5,6 +5,7 @@ AI Report Analyzer – full production build (May 2025)
 • Pointer-numbered insights
 • ≥2 ≤5 charts  (hist, line, bar)  auto-generated
 • Excel + PDF export  (insights + EVERY chart)
+• Handles CSV/Excel files up to 50k rows
 • Razorpay Checkout inline (650 px iframe)
 """
 
@@ -253,8 +254,15 @@ def inc_usage():
 
 # ----------------------------------------------------------------------
 def numberify(text: str) -> str:
+    """Format raw insight text into numbered sentences."""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
-    return "\n".join(f"{i+1}. {l.lstrip('-*0123456789. ')}" for i, l in enumerate(lines))
+    formatted = []
+    for l in lines:
+        l = l.lstrip("-*0123456789. ")
+        if not l.endswith(('.', '!', '?')):
+            l += '.'
+        formatted.append(l)
+    return "\n".join(f"{i+1}. {formatted[i]}" for i in range(len(formatted)))
 # ----------------------------------------------------------------------
 def auto_charts(df):
     charts, paths = [], []
@@ -582,10 +590,21 @@ def dashboard():
         S.update(insights=numberify(raw), chart_paths=[], df=pd.DataFrame())
         show_results(); inc_usage(); return
 
-    df = pd.read_csv(up) if up.name.endswith("csv") else pd.read_excel(up, engine="openpyxl")
+    max_rows = 50000
+    if up.name.endswith("csv"):
+        df = pd.read_csv(up, nrows=max_rows)
+    else:
+        df = pd.read_excel(up, engine="openpyxl", nrows=max_rows)
     st.dataframe(df.head())
     if st.button("Generate Insights"):
-        prompt = f"Summarise:\n{df.head(15).to_csv(index=False)}"
+        summary = df.describe(include="all").to_csv()
+        sample = df.head(15).to_csv(index=False)
+        prompt = (
+            "You are a data analyst. "
+            "Provide concise, decision-oriented insights in numbered sentences. "
+            "If no strong insights are present, offer a short overall summary.\n\n"
+            f"Data sample:\n{sample}\n\nSummary statistics:\n{summary}"
+        )
         with st.spinner("Analysing …"):
             raw = openai.ChatCompletion.create(
                 model="gpt-4o",
