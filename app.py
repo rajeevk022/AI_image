@@ -33,6 +33,7 @@ You are a chartered financial analyst and forensic accountant known for crisp, i
 # 1. Context
 You receive one PDF named "{pdf_filename}".
 Mine it for **actionable insights**. Typical uploads include company earnings calls, quarterly/annual reports, investor decks, or brokerage research. If the PDF is a general business document, adapt gracefully.
+Give special priority to any **audited financial statements**, **balance sheets**, or **sales statements** so these sections are never overlooked.
 
 # 2. Format your reply **exactly** like this (in markdown):
 
@@ -642,12 +643,12 @@ def dashboard():
         with st.spinner("Analysing PDF …"):
             messages = [
                 {"role": "system", "content": PDF_PROMPT_TEMPLATE.format(pdf_filename=up.name)},
-                {"role": "user", "content": text[:9000]},
+                {"role": "user", "content": text[:50000]},
             ]
             raw = openai.ChatCompletion.create(
                 model="gpt-4o",
                 messages=messages,
-                max_tokens=1500,
+                max_tokens=4096,
             )["choices"][0]["message"]["content"]
         S.update(insights=raw, chart_paths=[], df=pd.DataFrame())
         show_results(); inc_usage(); return
