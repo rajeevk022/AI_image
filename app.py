@@ -85,6 +85,24 @@ If the PDF is **not** about a public company or lacks financial data:
 
 Begin now. Do **not** reveal any internal reasoning—only produce the formatted report.
 """
+
+# Prompt used when the PDF is not recognised as a stock market/financial document
+GENERIC_PROMPT_TEMPLATE = """
+You are an expert document analyst. Read the PDF named "{pdf_filename}" and craft a concise summary suited to its subject matter.
+
+Format your response in markdown:
+
+## Overview
+A short paragraph summarising the overall topic and purpose of the document.
+
+## Key Points
+- Bullet the most important facts, arguments or figures found in the text.
+
+## Additional Notes
+- Mention any notable sections, data or next steps for the reader.
+
+Do not mention any internal deliberations. Begin now.
+"""
 # ────────────────────────────────────────────────────────────────────────
 firebase = pyrebase.initialize_app(firebase_config)
 auth, db = firebase.auth(), firebase.database()
@@ -352,6 +370,20 @@ def auto_charts(df):
 # ----------------------------------------------------------------------
 def to_latin1(text: str) -> str:
     return text.encode("latin-1", "replace").decode("latin-1")
+
+# ----------------------------------------------------------------------
+def is_stock_market_pdf(text: str) -> bool:
+    """Rudimentary check to see if the PDF text relates to stock markets."""
+    if not text:
+        return False
+    keywords = [
+        "stock", "share", "dividend", "equity", "earnings", "quarter",
+        "bse", "nse", "nasdaq", "nyse", "profit", "loss", "balance sheet",
+        "income statement", "cash flow", "market cap", "ipo",
+    ]
+    t = text.lower()
+    score = sum(kw in t for kw in keywords)
+    return score >= 3
 # ----------------------------------------------------------------------
 def export_excel(df, insights, paths):
     bio = BytesIO()
@@ -640,9 +672,15 @@ def dashboard():
         )
         if not text.strip():
             st.error("PDF appears to have no extractable text."); return
+
+        if is_stock_market_pdf(text):
+            prompt = PDF_PROMPT_TEMPLATE.format(pdf_filename=up.name)
+        else:
+            prompt = GENERIC_PROMPT_TEMPLATE.format(pdf_filename=up.name)
+
         with st.spinner("Analysing PDF …"):
             messages = [
-                {"role": "system", "content": PDF_PROMPT_TEMPLATE.format(pdf_filename=up.name)},
+                {"role": "system", "content": prompt},
                 {"role": "user", "content": text[:50000]},
             ]
             raw = openai.ChatCompletion.create(
