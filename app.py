@@ -728,8 +728,7 @@ def dashboard():
     up = st.file_uploader("Upload CSV / Excel / PDF", ["csv", "xlsx", "pdf"])
 
     if not up:
-        if S.get("insights"):
-            show_results()
+        show_results()
         return
 
     if up.type.endswith("pdf"):
@@ -755,30 +754,33 @@ def dashboard():
                 max_tokens=4096,
             )["choices"][0]["message"]["content"]
         S.update(insights=raw, chart_paths=[], df=pd.DataFrame(), pdf_text=text)
-        show_results(); inc_usage(); return
+        inc_usage()
+        show_results()
+        return
 
     max_rows = 50000
     if up.name.endswith("csv"):
-        df = pd.read_csv(up, nrows=max_rows)
+        df_full = pd.read_csv(up)
     else:
-        df = pd.read_excel(up, engine="openpyxl", nrows=max_rows)
+        df_full = pd.read_excel(up, engine="openpyxl")
+    S["df"] = df_full
     pd.set_option("display.max_rows", None)
     pd.set_option("display.max_columns", None)
-    st.dataframe(df)
+    st.dataframe(df_full)
     if st.button("Generate Insights"):
-        summary = df.describe(include="all").to_csv()
-        sample, rows_used, truncated = sample_data(df)
-        if truncated:
+        analysis_df = df_full.head(max_rows)
+        summary = analysis_df.describe(include="all").to_csv()
+        sample, rows_used, truncated = sample_data(analysis_df)
+        if len(df_full) > max_rows:
             st.warning(
-                f"Data truncated to {rows_used} rows and {len(df.columns)} columns due to token limits. "
-                "Upload the next part to analyse the remainder."
+                f"Dataset has {len(df_full)} rows; analysis uses first {max_rows} rows due to token limits."
             )
         prompt = (
             "You are a data analyst. "
             "Provide concise, decision-oriented insights in numbered sentences. "
             "If no strong insights are present, offer a short overall summary. "
             "Recommend charts based on the data itself rather than a fixed set.\n\n"
-            f"Data sample ({rows_used} rows, {len(df.columns)} columns):\n{sample}\n\nSummary statistics:\n{summary}"
+            f"Data sample ({rows_used} rows, {len(df_full.columns)} columns):\n{sample}\n\nSummary statistics:\n{summary}"
         )
         with st.spinner("Analysing …"):
             raw = openai.ChatCompletion.create(
@@ -786,9 +788,13 @@ def dashboard():
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=700,
             )["choices"][0]["message"]["content"]
-        charts, paths = auto_charts(df)
-        S.update(insights=numberify(raw), chart_paths=paths, df=df, pdf_text="")
-        show_results(); inc_usage()
+        charts, paths = auto_charts(analysis_df)
+        S.update(insights=numberify(raw), chart_paths=paths, df=df_full, pdf_text="")
+        inc_usage()
+        show_results()
+        return
+
+    show_results()
 # ----------------------------------------------------------------------
 def show_results():
     st.subheader("🔍 Insights")
