@@ -3,14 +3,14 @@ AI Report Analyzer – full production build (May 2025)
 -----------------------------------------------------
 • Freemium 3  →  Razorpay Pro 50  (admin unlimited)
 • Pointer-numbered insights
-• ≥2 ≤5 charts  (hist, line, bar)  auto-generated
+• ≥2 ≤5 charts generated dynamically based on the dataset
 • Excel + PDF export  (insights + EVERY chart)
 • Handles CSV/Excel files up to 50k rows
 • Razorpay Checkout inline (650 px iframe)
 """
 
 import os, time, tempfile, requests, streamlit as st
-import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, fitz, openai, pyrebase
+import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, numpy as np, fitz, openai, pyrebase
 import traceback, sys
 from io import BytesIO
 from dotenv import load_dotenv
@@ -77,6 +77,7 @@ Choose one call. Provide 2-3 sentences of justification.
 - Use active voice and plain English accessible to non-experts.
 - Cite the exact page (e.g., "(p. 12)") whenever quoting numbers or statements.
 - Where the PDF is silent on a required section, write "Information not provided" rather than guessing.
+- Recommend chart types based on the nature of any numbers or tables rather than using a fixed list.
 
 # 4. Fall-back Rules
 If the PDF is **not** about a public company or lacks financial data:
@@ -100,6 +101,7 @@ A short paragraph summarising the overall topic and purpose of the document.
 
 ## Additional Notes
 - Mention any notable sections, data or next steps for the reader.
+- If numerical tables appear, suggest chart types that best visualise them rather than relying on a fixed set of charts.
 
 Do not mention any internal deliberations. Begin now.
 """
@@ -341,7 +343,25 @@ def numberify(text: str) -> str:
         formatted.append(l)
     return "\n".join(f"{i+1}. {formatted[i]}" for i in range(len(formatted)))
 # ----------------------------------------------------------------------
+def sample_data(df, max_tokens=10000):
+    """Return CSV rows fitting roughly within a token budget."""
+    approx_chars_per_token = 4
+    max_chars = max_tokens * approx_chars_per_token
+    lines = df.to_csv(index=False).splitlines()
+    header, rows = lines[0], lines[1:]
+    used_rows, size, out = [], len(header) + 1, []
+    for r in rows:
+        row_len = len(r) + 1
+        if size + row_len > max_chars:
+            break
+        used_rows.append(r)
+        size += row_len
+    out = "\n".join([header] + used_rows)
+    truncated = len(used_rows) < len(rows)
+    return out, len(used_rows), truncated
+# ----------------------------------------------------------------------
 def auto_charts(df):
+    """Generate charts dynamically based on the data."""
     charts, paths = [], []
     num = df.select_dtypes("number").columns
     cat = df.select_dtypes("object").columns
@@ -350,16 +370,30 @@ def auto_charts(df):
         sns.histplot(df[num[0]].dropna(), ax=a, color="#ff78b3")
         a.set_title(f"Distribution of {num[0]}")
         charts.append(("Histogram", f))
+
     if len(num) >= 2:
+        corr = df[num].corr().abs()
+        np.fill_diagonal(corr.values, 0)
+        pair = corr.stack().idxmax()
         f, a = plt.subplots()
-        df.plot(x=num[0], y=num[1], ax=a, color="#ff78b3")
-        a.set_title(f"{num[1]} vs {num[0]}")
-        charts.append(("Line chart", f))
+        sns.scatterplot(data=df, x=pair[0], y=pair[1], ax=a, color="#ff78b3")
+        a.set_title(f"{pair[1]} vs {pair[0]}")
+        charts.append(("Scatter", f))
+
+    date_cols = [c for c in df.columns if "date" in c.lower()]
+    if date_cols and num.any():
+        d = pd.to_datetime(df[date_cols[0]], errors="coerce")
+        f, a = plt.subplots()
+        sns.lineplot(x=d, y=df[num[0]], ax=a, color="#ff78b3")
+        a.set_title(f"{num[0]} over time")
+        charts.append(("Time Series", f))
+
     if cat.any():
         f, a = plt.subplots()
         df[cat[0]].value_counts().head(10).plot(kind="bar", ax=a, color="#ff78b3")
         a.set_title(f"Top {cat[0]}")
-        charts.append(("Bar chart", f))
+        charts.append(("Bar", f))
+
     if len(charts) == 1:
         charts.append(charts[0])
     for _, fig in charts[:5]:
@@ -699,12 +733,18 @@ def dashboard():
     st.dataframe(df.head())
     if st.button("Generate Insights"):
         summary = df.describe(include="all").to_csv()
-        sample = df.head(15).to_csv(index=False)
+        sample, rows_used, truncated = sample_data(df)
+        if truncated:
+            st.warning(
+                f"Data truncated to {rows_used} rows and {len(df.columns)} columns due to token limits. "
+                "Upload the next part to analyse the remainder."
+            )
         prompt = (
             "You are a data analyst. "
             "Provide concise, decision-oriented insights in numbered sentences. "
-            "If no strong insights are present, offer a short overall summary.\n\n"
-            f"Data sample:\n{sample}\n\nSummary statistics:\n{summary}"
+            "If no strong insights are present, offer a short overall summary. "
+            "Recommend charts based on the data itself rather than a fixed set.\n\n"
+            f"Data sample ({rows_used} rows, {len(df.columns)} columns):\n{sample}\n\nSummary statistics:\n{summary}"
         )
         with st.spinner("Analysing …"):
             raw = openai.ChatCompletion.create(
