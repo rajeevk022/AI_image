@@ -185,6 +185,7 @@ if "S" not in st.session_state:
         "insights": "",
         "chart_paths": [],
         "df": pd.DataFrame(),
+        "pdf_text": "",
     }
 S = st.session_state.S
 # ────────────────────────────────────────────────────────────────────────
@@ -418,6 +419,37 @@ def is_stock_market_pdf(text: str) -> bool:
     t = text.lower()
     score = sum(kw in t for kw in keywords)
     return score >= 3
+# ----------------------------------------------------------------------
+def generate_custom_insights(user_prompt: str):
+    """Generate insights based on a user-provided prompt."""
+    if not user_prompt:
+        return
+
+    if not S["df"].empty:
+        summary = S["df"].describe(include="all").to_csv()
+        sample, rows_used, _ = sample_data(S["df"])
+        prompt = (
+            f"{user_prompt}\n\nData sample ({rows_used} rows,"
+            f" {len(S['df'].columns)} columns):\n{sample}\n\nSummary statistics:\n{summary}"
+        )
+    elif S.get("pdf_text"):
+        prompt = f"{user_prompt}\n\n{S['pdf_text'][:50000]}"
+    else:
+        prompt = user_prompt
+
+    with st.spinner("Analysing …"):
+        raw = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=700,
+        )["choices"][0]["message"]["content"]
+
+    charts, paths = [], []
+    if not S["df"].empty:
+        charts, paths = auto_charts(S["df"])
+
+    S.update(insights=numberify(raw), chart_paths=paths)
+
 # ----------------------------------------------------------------------
 def export_excel(df, insights, paths):
     bio = BytesIO()
@@ -722,7 +754,7 @@ def dashboard():
                 messages=messages,
                 max_tokens=4096,
             )["choices"][0]["message"]["content"]
-        S.update(insights=raw, chart_paths=[], df=pd.DataFrame())
+        S.update(insights=raw, chart_paths=[], df=pd.DataFrame(), pdf_text=text)
         show_results(); inc_usage(); return
 
     max_rows = 50000
@@ -755,11 +787,23 @@ def dashboard():
                 max_tokens=700,
             )["choices"][0]["message"]["content"]
         charts, paths = auto_charts(df)
-        S.update(insights=numberify(raw), chart_paths=paths, df=df)
+        S.update(insights=numberify(raw), chart_paths=paths, df=df, pdf_text="")
         show_results(); inc_usage()
 # ----------------------------------------------------------------------
 def show_results():
     st.subheader("🔍 Insights")
+    prompt = st.text_area(
+        "Custom Insight Prompt",
+        key="custom_prompt",
+        placeholder="Ask a question or request a tailored analysis...",
+    )
+    if st.button("Generate Custom Insights", key="custom_btn"):
+        if prompt.strip():
+            generate_custom_insights(prompt)
+            st.rerun()
+        else:
+            st.warning("Please enter a prompt before generating.")
+
     st.write(S["insights"])
     if S["chart_paths"]:
         st.subheader("📊 Charts")
