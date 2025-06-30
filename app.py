@@ -730,7 +730,9 @@ def dashboard():
         df = pd.read_csv(up, nrows=max_rows)
     else:
         df = pd.read_excel(up, engine="openpyxl", nrows=max_rows)
-    st.dataframe(df.head())
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_columns", None)
+    st.dataframe(df)
     if st.button("Generate Insights"):
         summary = df.describe(include="all").to_csv()
         sample, rows_used, truncated = sample_data(df)
