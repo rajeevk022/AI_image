@@ -227,6 +227,21 @@ def load_user(uid, silent=False):
         valid_until = rec.get("pro_valid_until", 0)
         log(f"Fetched 'upgrade': {is_pro}, 'pro_valid_until': {valid_until}")
 
+        # If the stored expiry timestamp is in the future we should treat
+        # the user as Pro even if the upgrade flag wasn't set due to a
+        # webhook or database glitch. In that case, auto-correct the flag
+        # so future reads remain consistent.
+        if valid_until > now and not is_pro:
+            log(
+                "Valid Pro expiry found but upgrade flag was False – "
+                "auto-correcting database record"
+            )
+            is_pro = True
+            try:
+                db.child("users").child(uid).update({"upgrade": True}, token)
+            except Exception as corr_e:
+                log(f"Failed to update upgrade flag for {uid}: {corr_e}")
+
         # Check for expired Pro plan and downgrade if necessary
         if is_pro and valid_until < now:
             log(f"Pro plan for {uid} expired (valid until {valid_until}), downgrading.")
