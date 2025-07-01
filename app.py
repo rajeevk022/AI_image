@@ -190,25 +190,26 @@ if "S" not in st.session_state:
 S = st.session_state.S
 # ────────────────────────────────────────────────────────────────────────
 
-def load_user(uid):
+def load_user(uid, silent=False):
     """Loads user plan and usage data from Realtime Database."""
-    st.write(f"--- Loading user data for UID: {uid} ---") # Log start
+    log = st.write if not silent else lambda *a, **k: None
+    log(f"--- Loading user data for UID: {uid} ---")
     try:
         # Attempt to fetch data from the user's node
-        st.write(f"Fetching data from /users/{uid}")
+        log(f"Fetching data from /users/{uid}")
         token = S.get("token")
         rec = db.child("users").child(uid).get(token).val()
-        st.write(f"Raw data fetched for {uid}: {rec}") # Log the raw data
+        log(f"Raw data fetched for {uid}: {rec}")
 
         # Explicitly handle the case where no data exists (rec is None)
         if rec is None:
             rec = {}
-            st.write("No data found for user in DB, treating as empty.")
+            log("No data found for user in DB, treating as empty.")
 
         # Check if the fetched data is actually a dictionary (or compatible)
         if not isinstance(rec, dict):
              st.error(f"Unexpected data type found for user {uid}. Expected dictionary, got {type(rec)}.")
-             st.write(f"Attempting to proceed with empty dictionary due to unexpected type.")
+             log(f"Attempting to proceed with empty dictionary due to unexpected type.")
              rec = {} # Fallback to empty dict
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
@@ -217,18 +218,18 @@ def load_user(uid):
         current_email = S.get("email", "") # Get email safely from session state
         if current_email == ADMIN_EMAIL:
             S.update(plan="admin", used=0, admin=True, upgrade=True)
-            st.write(f"User {uid} ({current_email}) identified as admin.")
-            st.write("--- load_user finished for admin ---")
+            log(f"User {uid} ({current_email}) identified as admin.")
+            log("--- load_user finished for admin ---")
             return # Exit early for admin
 
         # Fetch plan details from the record, defaulting if keys are missing
         is_pro      = rec.get("upgrade", False)
         valid_until = rec.get("pro_valid_until", 0)
-        st.write(f"Fetched 'upgrade': {is_pro}, 'pro_valid_until': {valid_until}")
+        log(f"Fetched 'upgrade': {is_pro}, 'pro_valid_until': {valid_until}")
 
         # Check for expired Pro plan and downgrade if necessary
         if is_pro and valid_until < now:
-            st.write(f"Pro plan for {uid} expired (valid until {valid_until}), downgrading.")
+            log(f"Pro plan for {uid} expired (valid until {valid_until}), downgrading.")
             rec["upgrade"] = False
             rec["plan"] = "free"
             rec["report_count"] = 0 # Reset count on downgrade
@@ -236,10 +237,10 @@ def load_user(uid):
             # Add error handling for the database update itself
             try:
                 db.child("users").child(uid).update(rec, token)
-                st.write(f"Successfully updated user {uid} data in DB after downgrade.")
+                log(f"Successfully updated user {uid} data in DB after downgrade.")
             except Exception as update_e:
                  st.error(f"Failed to update user {uid} data in DB after downgrade attempt: {update_e}")
-                 st.write(f"Update failed traceback:")
+                 log(f"Update failed traceback:")
                  traceback.print_exc(file=sys.stderr)
             is_pro = False # Ensure is_pro reflects the new state
 
@@ -248,7 +249,7 @@ def load_user(uid):
         # Safely get report_count, ensuring it's an int
         report_count_raw = rec.get("report_count", 0)
         used = int(report_count_raw) if isinstance(report_count_raw, (int, float)) else 0
-        st.write(f"Calculated current plan: {plan}, reports used: {used}")
+        log(f"Calculated current plan: {plan}, reports used: {used}")
 
         # Check if the user just upgraded in this session (optional logic)
         # This relies on the 'upgrade' state in S potentially being different from DB state initially
@@ -256,18 +257,18 @@ def load_user(uid):
         # For now, keeping original logic but logging it.
         if is_pro and not S.get("upgrade"):
             S["just_upgraded"] = True
-            st.write(f"User {uid} just upgraded to Pro.")
+            log(f"User {uid} just upgraded to Pro.")
 
         # Update the session state with the loaded user data
         # Ensure email and uid are kept from successful authentication login_screen handles this
         S.update(plan=plan, used=used, admin=False, upgrade=is_pro)
-        st.write(f"Session state S updated for user {uid}: {S}")
-        st.write("--- load_user finished successfully ---")
+        log(f"Session state S updated for user {uid}: {S}")
+        log("--- load_user finished successfully ---")
 
     except Exception as e:
         # This is the catch for errors during the database fetch or data processing
-        st.write(f"--- Exception caught in load_user for UID {uid} ---")
-        st.write(f"Specific error: {e}")
+        log(f"--- Exception caught in load_user for UID {uid} ---")
+        log(f"Specific error: {e}")
         # Print the full traceback to the console where your Streamlit app is running
         traceback.print_exc(file=sys.stderr)
         # Display the user-friendly error message in the Streamlit app
@@ -686,6 +687,15 @@ def login_screen():
 
 # ----------------------------------------------------------------------
 def dashboard():
+    # Always fetch latest plan/usage so any completed payment immediately
+    # reflects in the UI without requiring a manual refresh.
+    uid = S.get("uid")
+    if uid:
+        try:
+            load_user(uid, silent=True)
+        except Exception as e:
+            st.write(f"Failed to refresh user data: {e}")
+
     admin = S.get("admin", False)
     plan = S.get("plan", "free")
     used = S.get("used", 0)
@@ -709,7 +719,7 @@ def dashboard():
         sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
         if sb.button("💳 Upgrade to Pro (₹299)"):
             open_razorpay(S["email"])
-            st.info("🕒 Complete payment, then click 'Home' to refresh status.")
+            st.info("🕒 Complete payment. Your Pro status will update automatically.")
             st.stop()
 
     if sb.button("🚪 Logout"):
