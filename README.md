@@ -4,7 +4,8 @@
 - Supports CSV and Excel files with up to **50k rows** for insight generation.
 - Automatic upgrade to the **Pro** plan once a payment succeeds. The Pro plan
   allows up to **50 reports per month** and the status refreshes without manual
-  reloads.
+  reloads. If the webhook fails to set the upgrade flag, the app now corrects it
+  whenever it detects a valid Pro expiry timestamp.
 
 ## Environment Variables
 
