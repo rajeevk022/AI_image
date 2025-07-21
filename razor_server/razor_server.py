@@ -10,7 +10,9 @@ KEY  = os.getenv("RZP_KEY")
 SECRET = os.getenv("RZP_SECRET")
 WEBHOOK_SECRET = os.getenv("RZP_WEBHOOK_SECRET")
 client = razorpay.Client(auth=(KEY, SECRET))
-PRICE = 299  # INR
+# Price for the Pro subscription in rupees. Default is 1 for testing
+# Set the PRO_PRICE environment variable to override.
+PRICE = int(os.getenv("PRO_PRICE", "1"))  # INR
 
 app = FastAPI()
 
