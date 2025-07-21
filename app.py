@@ -22,6 +22,8 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 RZP_SERVER = os.getenv("RZP_SERVER")     # e.g. https://ai-image-1n31.onrender.com
 RZP_KEY_ID = os.getenv("RZP_KEY_ID")     # rzp_test_xxx / rzp_live_xxx
+# Price of the Pro plan in rupees. Default is 1 for testing.
+PRO_PRICE = int(os.getenv("PRO_PRICE", "1"))
 
 ADMIN_EMAIL = "rajeevk021@gmail.com"
 FREE_LIMIT  = 3
@@ -529,10 +531,10 @@ def open_razorpay(email) -> bool:
         <script>
           var opt = {{
             key:"{RZP_KEY_ID}",amount:"{order['amount']}",currency:"INR",
-            name:"AI Report Analyzer",description:"Pro Plan (₹299)",
+            name:"AI Report Analyzer",description:"Pro Plan (₹{PRO_PRICE})",
             order_id:"{order['id']}",prefill:{{email:"{email}"}},
             theme:{{color:"#ff4f9d"}},
-            handler:function(){{window.location.reload();}}
+            handler:function(){{var msg=document.createElement('p');msg.innerText='Payment successful! Redirecting...';msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';document.body.appendChild(msg);setTimeout(function(){{window.location.reload();}},1500);}}
           }};
           new Razorpay(opt).open();
         </script>
@@ -694,7 +696,7 @@ def login_screen():
     with c3:
         with st.expander("💸 Refund Policy"):
             st.markdown(
-                "Full refund within **10 days** of first Pro purchase (₹299/mo).  \n"
+                f"Full refund within **10 days** of first Pro purchase (₹{PRO_PRICE}/mo).  \n"
                 "Email **rajeevk021@gmail.com** with payment ID.  \n"
                 "Refund issued in 5-7 business days. No refunds after 10 days or on renewals."
             )
@@ -719,7 +721,9 @@ def dashboard():
     sb.write(f"**👤 User:** {S['email']}")
 
     if S.get("just_upgraded"):
-        st.success("✅ You have successfully upgraded to Pro!")
+        st.success(
+            "✅ Payment successful! Pro access enabled for 30 days with up to 50 reports."
+        )
         S["just_upgraded"] = False
 
     if sb.button("🏠 Home"):
@@ -732,7 +736,7 @@ def dashboard():
         sb.success(f"✅ Pro • {remaining}/{PRO_LIMIT} reports left")
     elif plan == "free":
         sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
-        if sb.button("💳 Upgrade to Pro (₹299)"):
+        if sb.button(f"💳 Upgrade to Pro (₹{PRO_PRICE})"):
             open_razorpay(S["email"])
             st.info("🕒 Complete payment. Your Pro status will update automatically.")
             st.stop()
