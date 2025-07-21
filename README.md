@@ -3,9 +3,11 @@
 ## Features
 - Supports CSV and Excel files with up to **50k rows** for insight generation.
 - Automatic upgrade to the **Pro** plan once a payment succeeds. The Pro plan
-  allows up to **50 reports per month** and the status refreshes without manual
-  reloads. If the webhook fails to set the upgrade flag, the app now corrects it
-  whenever it detects a valid Pro expiry timestamp.
+  allows up to **50 reports per month** with access valid for **30 days**. The
+  status refreshes automatically without manual reloads. If the webhook fails to
+  set the upgrade flag, the app now corrects it whenever it detects a valid Pro
+  expiry timestamp. A "Payment successful" message appears once the upgrade takes
+  effect. For testing, the subscription charge is set to **₹1**.
 
 ## Environment Variables
 
@@ -17,6 +19,7 @@ Set the following variables before starting the app:
 - `RZP_KEY` – key for the Razorpay order server.
 - `RZP_SECRET` – secret for the Razorpay order server.
 - `RZP_WEBHOOK_SECRET` – webhook verification secret used by the server.
+- `PRO_PRICE` – cost of the Pro subscription in rupees (default **1** for testing).
 
 ## Running Locally
 
