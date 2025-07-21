@@ -534,7 +534,7 @@ def open_razorpay(email) -> bool:
             name:"AI Report Analyzer",description:"Pro Plan (₹{PRO_PRICE})",
             order_id:"{order['id']}",prefill:{{email:"{email}"}},
             theme:{{color:"#ff4f9d"}},
-            handler:function(){{var msg=document.createElement('p');msg.innerText='Payment successful! Redirecting...';msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';document.body.appendChild(msg);setTimeout(function(){{window.location.reload();}},1500);}}
+            handler:function(){{var msg=document.createElement('p');msg.innerText='Payment successful! Redirecting...';msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';document.body.appendChild(msg);setTimeout(function(){{window.parent.location.reload();}},1500);}}
           }};
           new Razorpay(opt).open();
         </script>
