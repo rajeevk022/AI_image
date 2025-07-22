@@ -752,7 +752,6 @@ def dashboard():
             st.info(
                 "🕒 Complete payment. This page will update once the payment succeeds."
             )
-       main
             uid = S.get("uid")
             for _ in range(30):
                 time.sleep(2)
@@ -765,8 +764,7 @@ def dashboard():
             st.warning(
                 "Payment not confirmed yet. If you completed the payment, please refresh."
             )
-            
-         main
+
             st.stop()
 
     if sb.button("🚪 Logout"):
