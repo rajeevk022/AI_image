@@ -215,9 +215,18 @@ def load_user(uid, silent=False):
              rec = {} # Fallback to empty dict
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
-
         # Check if the logged-in email is the admin email
-        current_email = S.get("email", "") # Get email safely from session state
+        current_email = S.get("email", "")  # Get email safely from session state
+
+        # Ensure the email is stored in the database. Older records created
+        # before this field was added may not have it, which can break the
+        # webhook upgrade process that relies on email lookups.
+        if current_email and rec.get("email") != current_email:
+            try:
+                db.child("users").child(uid).update({"email": current_email}, token)
+                log(f"Stored email '{current_email}' for {uid} in DB")
+            except Exception as email_e:
+                log(f"Failed to store email for {uid}: {email_e}")
         if current_email == ADMIN_EMAIL:
             S.update(plan="admin", used=0, admin=True, upgrade=True)
             log(f"User {uid} ({current_email}) identified as admin.")
