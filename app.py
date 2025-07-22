@@ -534,7 +534,12 @@ def open_razorpay(email) -> bool:
             name:"AI Report Analyzer",description:"Pro Plan (₹{PRO_PRICE})",
             order_id:"{order['id']}",prefill:{{email:"{email}"}},
             theme:{{color:"#ff4f9d"}},
-            handler:function(){{var msg=document.createElement('p');msg.innerText='Payment successful! Redirecting...';msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';document.body.appendChild(msg);setTimeout(function(){{window.parent.location.reload();}},1500);}}
+            handler:function(){{
+              var msg=document.createElement('p');
+              msg.innerText='Payment successful!';
+              msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';
+              document.body.appendChild(msg);
+            }}
           }};
           new Razorpay(opt).open();
         </script>
@@ -738,7 +743,15 @@ def dashboard():
         sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
         if sb.button(f"💳 Upgrade to Pro (₹{PRO_PRICE})"):
             open_razorpay(S["email"])
-            st.info("🕒 Complete payment. Your Pro status will update automatically.")
+            st.info("🕒 Complete payment. This page will update once the payment succeeds.")
+            uid = S.get("uid")
+            for _ in range(30):
+                time.sleep(2)
+                load_user(uid, silent=True)
+                if S.get("upgrade"):
+                    S["just_upgraded"] = True
+                    st.experimental_rerun()
+            st.warning("Payment not confirmed yet. If you completed the payment, please refresh.")
             st.stop()
 
     if sb.button("🚪 Logout"):
