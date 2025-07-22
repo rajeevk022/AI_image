@@ -531,10 +531,15 @@ def open_razorpay(email) -> bool:
         <script>
           var opt = {{
             key:"{RZP_KEY_ID}",amount:"{order['amount']}",currency:"INR",
-            name:"AI Report Analyzer",description:"Pro Plan (₹{PRO_PRICE})",
+            name:"AI Report Analyzer",description:"Premium Plan (₹{PRO_PRICE})",
             order_id:"{order['id']}",prefill:{{email:"{email}"}},
             theme:{{color:"#ff4f9d"}},
-            handler:function(){{var msg=document.createElement('p');msg.innerText='Payment successful! Redirecting...';msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';document.body.appendChild(msg);setTimeout(function(){{window.parent.location.reload();}},1500);}}
+            handler:function(){{
+              var msg=document.createElement('p');
+              msg.innerText='Payment successful!';
+              msg.style='font-size:1.2rem;color:green;text-align:center;margin-top:15px;';
+              document.body.appendChild(msg);
+            }}
           }};
           new Razorpay(opt).open();
         </script>
@@ -722,7 +727,7 @@ def dashboard():
 
     if S.get("just_upgraded"):
         st.success(
-            "✅ Payment successful! Pro access enabled for 30 days with up to 50 reports."
+            "✅ Payment successful! Premium access enabled for 30 days with up to 50 reports."
         )
         S["just_upgraded"] = False
 
@@ -733,12 +738,31 @@ def dashboard():
         sb.success("Admin • Unlimited")
     elif plan == "pro":
         remaining = max(0, PRO_LIMIT - used)
-        sb.success(f"✅ Pro • {remaining}/{PRO_LIMIT} reports left")
+        sb.success(f"✅ Premium • {remaining}/{PRO_LIMIT} reports left")
     elif plan == "free":
         sb.warning(f"Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
-        if sb.button(f"💳 Upgrade to Pro (₹{PRO_PRICE})"):
+        upgrade_disabled = S.get("upgrade_in_progress", False)
+        if sb.button(
+            f"💳 Upgrade to Premium (₹{PRO_PRICE})",
+            disabled=upgrade_disabled,
+        ):
+            S["upgrade_in_progress"] = True
             open_razorpay(S["email"])
-            st.info("🕒 Complete payment. Your Pro status will update automatically.")
+            st.info(
+                "🕒 Complete payment. This page will update once the payment succeeds."
+            )
+            uid = S.get("uid")
+            for _ in range(30):
+                time.sleep(2)
+                load_user(uid, silent=True)
+                if S.get("upgrade"):
+                    S["just_upgraded"] = True
+                    S["upgrade_in_progress"] = False
+                    st.experimental_rerun()
+            st.warning(
+                "Payment not confirmed yet. If you completed the payment, please refresh."
+            )
+            S["upgrade_in_progress"] = False
             st.stop()
 
     if sb.button("🚪 Logout"):
