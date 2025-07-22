@@ -748,21 +748,25 @@ def dashboard():
         ):
             S["upgrade_in_progress"] = True
             open_razorpay(S["email"])
+
             st.info(
                 "🕒 Complete payment. This page will update once the payment succeeds."
             )
+       main
             uid = S.get("uid")
             for _ in range(30):
                 time.sleep(2)
                 load_user(uid, silent=True)
                 if S.get("upgrade"):
                     S["just_upgraded"] = True
+
                     S["upgrade_in_progress"] = False
                     st.experimental_rerun()
             st.warning(
                 "Payment not confirmed yet. If you completed the payment, please refresh."
             )
-            S["upgrade_in_progress"] = False
+            
+         main
             st.stop()
 
     if sb.button("🚪 Logout"):
