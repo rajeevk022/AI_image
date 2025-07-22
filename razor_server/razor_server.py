@@ -42,14 +42,33 @@ async def webhook(req: Request):
         pay   = data["payload"]["payment"]["entity"]
         status = pay.get("status")
         email  = pay.get("email")
+
+        # Fallback to the order receipt (set to the user's email) if the
+        # payment object does not include an email. Some Razorpay flows omit
+        # the email field, which previously caused upgrades to fail.
+        if not email:
+            oid = pay.get("order_id")
+            if oid:
+                try:
+                    order = client.order.fetch(oid)
+                    email = order.get("receipt")
+                except Exception:
+                    email = None
+
         if status == "captured" and email:
-            uid = auth.get_user_by_email(email).uid
-            valid_until = int(time.time() + 30*24*3600)     # +30 days
-            db.reference(f"users/{uid}").update({
-                "plan":            "pro",
-                "upgrade":         True,
-                "report_count":    0,
-                "pro_valid_until": valid_until
-            })
+            try:
+                uid = auth.get_user_by_email(email).uid
+            except Exception:
+                uid = None
+
+            if uid:
+                valid_until = int(time.time() + 30*24*3600)     # +30 days
+                db.reference(f"users/{uid}").update({
+                    "plan":            "pro",
+                    "upgrade":         True,
+                    "report_count":    0,
+                    "pro_valid_until": valid_until,
+                    "email":           email,
+                })
     return {"ok": True}
 

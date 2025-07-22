@@ -215,9 +215,18 @@ def load_user(uid, silent=False):
              rec = {} # Fallback to empty dict
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
-
         # Check if the logged-in email is the admin email
-        current_email = S.get("email", "") # Get email safely from session state
+        current_email = S.get("email", "")  # Get email safely from session state
+
+        # Ensure the email is stored in the database. Older records created
+        # before this field was added may not have it, which can break the
+        # webhook upgrade process that relies on email lookups.
+        if current_email and rec.get("email") != current_email:
+            try:
+                db.child("users").child(uid).update({"email": current_email}, token)
+                log(f"Stored email '{current_email}' for {uid} in DB")
+            except Exception as email_e:
+                log(f"Failed to store email for {uid}: {email_e}")
         if current_email == ADMIN_EMAIL:
             S.update(plan="admin", used=0, admin=True, upgrade=True)
             log(f"User {uid} ({current_email}) identified as admin.")
@@ -580,51 +589,56 @@ def login_screen():
             pwd = st.text_input("Password", type="password", key="login_pwd")
 
             if st.button("Sign in", key="signin_btn"):
-                st.write("--- Attempting Login ---")
-                st.write(f"Attempting to sign in with email: {email}")
+                # Debug logs below were useful during development but
+                # clutter the interface during normal use. Commented out
+                # to keep the login flow clean.
+                # st.write("--- Attempting Login ---")
+                # st.write(f"Attempting to sign in with email: {email}")
                 # ① Auth
                 try:
                     user = auth.sign_in_with_email_and_password(email, pwd)
                     uid = user.get("localId")
                     token = user.get("idToken")
-                    st.write(f"Authentication successful. Received raw user data: {user}")
-                    st.write(f"Extracted UID: {uid}")
+                    # Debug output
+                    # st.write(f"Authentication successful. Received raw user data: {user}")
+                    # st.write(f"Extracted UID: {uid}")
                     # Check if UID and token are present as expected by original code
                     if not (uid and "idToken" in user):
-                        st.write("Authentication response missing expected UID or idToken.")
+                        # st.write("Authentication response missing expected UID or idToken.")
                         raise ValueError("Authentication token or UID missing from response.")
 
                 except Exception as auth_e:
-                    st.write(f"Authentication failed: {auth_e}")
+                    # st.write(f"Authentication failed: {auth_e}")
                     traceback.print_exc(file=sys.stderr) # Print auth failure traceback
                     st.error("❌ Invalid email or password.")
                     st.stop() # Stop the app flow on auth failure
 
-                st.write("Authentication step completed successfully.")
+                # st.write("Authentication step completed successfully.")
 
                 # Store email and uid in session state immediately after successful auth
                 S["email"] = email
                 S["uid"] = uid
                 S["token"] = token
-                st.write(f"Stored email ({email}) and uid ({uid}) in session state.")
+                # st.write(f"Stored email ({email}) and uid ({uid}) in session state.")
 
 
                 # ② Load plan
-                st.write("Calling load_user function...")
+                # st.write("Calling load_user function...")
                 try:
                     # load_user function now handles its own exceptions internally
                     load_user(uid)
-                    st.write("load_user function call completed.")
+                    # st.write("load_user function call completed.")
                     # Check if S['plan'] and S['used'] were updated by load_user
                     if S.get('plan') is None or S.get('used') is None:
-                         st.write("Warning: Session state 'plan' or 'used' not set by load_user.")
+                         # st.write("Warning: Session state 'plan' or 'used' not set by load_user.")
+                         pass
 
 
                 except Exception as load_e:
                     # This catch block is less likely to be hit now that load_user handles
                     # its database fetch errors, but it catches anything load_user might re-raise
                     # or other unexpected errors *after* the load_user call returns.
-                    st.write(f"Unexpected exception caught after calling load_user: {load_e}")
+                    # st.write(f"Unexpected exception caught after calling load_user: {load_e}")
                     traceback.print_exc(file=sys.stderr)
                     st.error(
                         "An unexpected error occurred while finalizing login. "
@@ -633,11 +647,11 @@ def login_screen():
                     st.stop() # Stop the app flow on this unexpected error
 
                 # ③ Success
-                st.write("Login process considered successful based on previous steps. Updating session state for navigation.")
+                # st.write("Login process considered successful based on previous steps. Updating session state for navigation.")
                 # S['email'] and S['uid'] are already set above.
                 S["page"] = "dash" # Set the page to dashboard
                 st.success("✅ Logged in! Redirecting…")
-                st.write("--- Login successful, rerunning ---")
+                # st.write("--- Login successful, rerunning ---")
                 time.sleep(0.5) # Add a small delay before rerunning
                 st.rerun() # Rerun the app to switch to the dashboard page
 
