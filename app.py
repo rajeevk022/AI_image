@@ -731,6 +731,15 @@ def dashboard():
         )
         S["just_upgraded"] = False
 
+    # Display current plan status in the main page
+    if admin:
+        st.info("Plan: Admin (unlimited reports)")
+    elif plan == "pro":
+        remaining = max(0, PRO_LIMIT - used)
+        st.success(f"Plan: Premium • {remaining}/{PRO_LIMIT} reports left")
+    else:
+        st.warning(f"Plan: Free • {FREE_LIMIT - used}/{FREE_LIMIT}")
+
     if sb.button("🏠 Home"):
         st.rerun()
 
@@ -752,7 +761,6 @@ def dashboard():
             st.info(
                 "🕒 Complete payment. This page will update once the payment succeeds."
             )
-       main
             uid = S.get("uid")
             for _ in range(30):
                 time.sleep(2)
@@ -765,8 +773,9 @@ def dashboard():
             st.warning(
                 "Payment not confirmed yet. If you completed the payment, please refresh."
             )
-            
-         main
+
+            S["upgrade_in_progress"] = False
+
             st.stop()
 
     if sb.button("🚪 Logout"):
