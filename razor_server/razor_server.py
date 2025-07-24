@@ -61,6 +61,17 @@ async def webhook(req: Request):
             except Exception:
                 uid = None
 
+            # Fallback DB lookup if email not found in auth
+            if not uid:
+                try:
+                    snap = db.reference("users")\
+                        .order_by_child("email")\
+                        .equal_to(email).get()
+                    if isinstance(snap, dict) and snap:
+                        uid = next(iter(snap.keys()))
+                except Exception:
+                    uid = None
+
             if uid:
                 valid_until = int(time.time() + 30*24*3600)     # +30 days
                 db.reference(f"users/{uid}").update({
