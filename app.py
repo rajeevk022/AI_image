@@ -192,6 +192,33 @@ if "S" not in st.session_state:
 S = st.session_state.S
 # ────────────────────────────────────────────────────────────────────────
 
+def get_current_uid():
+    """Return UID from session or look it up by email."""
+    uid = S.get("uid")
+    if uid:
+        return uid
+
+    email = S.get("email")
+    token = S.get("token")
+    if not (email and token):
+        return None
+
+    try:
+        rec = (
+            db.child("users")
+            .order_by_child("email")
+            .equal_to(email)
+            .get(token)
+            .val()
+        )
+        if isinstance(rec, dict) and rec:
+            uid = next(iter(rec.keys()))
+            S["uid"] = uid
+            return uid
+    except Exception:
+        pass
+    return None
+
 def load_user(uid, silent=False):
     """Loads user plan and usage data from Realtime Database."""
     log = st.write if not silent else lambda *a, **k: None
@@ -349,10 +376,9 @@ def inc_usage():
     if S.get("admin"):
         st.write("User is admin, usage not tracked.")
         return
-    key = S.get("uid")
+    key = get_current_uid()
     if not key:
-        st.error("Cannot increment usage: User UID not found in session.")
-        st.write("UID missing from session state.")
+        st.error("Cannot increment usage: User ID not found.")
         return
 
     # Fetch the current count from the database before incrementing to avoid simple race conditions
@@ -753,7 +779,7 @@ def login_screen():
 def dashboard():
     # Always fetch latest plan/usage so any completed payment immediately
     # reflects in the UI without requiring a manual refresh.
-    uid = S.get("uid")
+    uid = get_current_uid()
     if uid:
         try:
             load_user(uid, silent=True)
@@ -794,7 +820,7 @@ def dashboard():
             st.info(
                 "🕒 Complete payment. This page will update once the payment succeeds."
             )
-            uid = S.get("uid")
+            uid = get_current_uid()
             for _ in range(30):
                 time.sleep(2)
                 load_user(uid, silent=True)
