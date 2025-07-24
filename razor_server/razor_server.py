@@ -1,53 +1,61 @@
 import os
 import razorpay
 import time
-from fastapi import FastAPI, Request, HTTPException, status # Import status for clearer HTTP responses
+from fastapi import FastAPI, Request, HTTPException, status
 from firebase_admin import credentials, initialize_app, db, auth
 from datetime import datetime, timezone
-import logging # For more structured logging
-import traceback # To print full tracebacks for debugging
+import logging
+import traceback
+import sys # Import sys for printing full tracebacks
 
 # --- Logging Setup ---
 # Configure logging to see detailed messages in your server's logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# --- Environment Variables ---
+# Fetch all critical environment variables at the top
+RZP_KEY = os.getenv("RZP_KEY")
+RZP_SECRET = os.getenv("RZP_SECRET")
+RZP_WEBHOOK_SECRET = os.getenv("RZP_WEBHOOK_SECRET") # Your custom webhook secret from Razorpay dashboard
+
+# --- Critical Startup Checks for Environment Variables ---
+if not all([RZP_KEY, RZP_SECRET, RZP_WEBHOOK_SECRET]):
+    logger.critical("CRITICAL ERROR: Missing one or more required environment variables (RZP_KEY, RZP_SECRET, RZP_WEBHOOK_SECRET).")
+    logger.critical("Please set these securely on your production environment (Render dashboard -> Environment).")
+    # In a real production scenario, you might want to exit if not configured
+    # sys.exit(1) # Uncomment if you want the app to crash on missing env vars
+
+if not RZP_WEBHOOK_SECRET:
+    logger.critical("CRITICAL ERROR: RZP_WEBHOOK_SECRET is not set at startup. Webhook verification will fail!")
+else:
+    logger.info(f"RZP_WEBHOOK_SECRET present at startup. Length: {len(RZP_WEBHOOK_SECRET)}")
+
+
 # --- Firebase Admin SDK Initialization ---
 # IMPORTANT: This uses Application Default Credentials.
-# Ensure your server environment (e.g., Google Cloud Run, App Engine, or a VM with GOOGLE_APPLICATION_CREDENTIALS set)
-# has access to your Firebase project. The service account needs "Firebase Realtime Database Admin" role.
+# Ensure your server environment (e.g., Render) has access to your Firebase project.
+# The service account needs "Firebase Realtime Database Admin" and "Firebase Authentication Admin" roles.
 try:
+    # Ensure databaseURL matches your project's default RTDB instance
     initialize_app(credentials.ApplicationDefault(),
                    {"databaseURL": "https://ai-report-analyzer-594dd-default-rtdb.asia-southeast1.firebasedatabase.app/"})
     logger.info("Firebase Admin SDK initialized successfully.")
 except Exception as e:
     logger.critical(f"Failed to initialize Firebase Admin SDK: {e}")
-    logger.critical("Ensure GOOGLE_APPLICATION_CREDENTIALS is set or running on Google Cloud with proper permissions.")
-    # In a real production scenario, you might want to exit if Firebase cannot initialize
-    # sys.exit(1) # Uncomment if you want the app to crash on Firebase init failure
+    logger.critical("Ensure GOOGLE_APPLICATION_CREDENTIALS is set in Render's environment variables and service account has proper permissions.")
+    sys.exit(1) # Exit if Firebase cannot initialize, as it's a core dependency
 
-# --- Razorpay Configuration ---
-# IMPORTANT: These environment variables MUST be set securely on your production server.
-RZP_KEY = os.getenv("RZP_KEY")
-RZP_SECRET = os.getenv("RZP_SECRET")
-RZP_WEBHOOK_SECRET = os.getenv("RZP_WEBHOOK_SECRET") # Your custom webhook secret from Razorpay dashboard
-
-if not all([RZP_KEY, RZP_SECRET, RZP_WEBHOOK_SECRET]):
-    logger.critical("CRITICAL ERROR: Missing one or more Razorpay environment variables (RZP_KEY, RZP_SECRET, RZP_WEBHOOK_SECRET).")
-    logger.critical("Please set these securely on your production environment.")
-    # Consider raising an error or exiting here in a strict production environment
-    # raise ValueError("Razorpay credentials not fully configured.")
-
+# --- Razorpay Client Initialization ---
 try:
     client = razorpay.Client(auth=(RZP_KEY, RZP_SECRET))
     logger.info("Razorpay client initialized.")
 except Exception as e:
     logger.critical(f"Failed to initialize Razorpay client: {e}")
-    # Consider raising an error here too.
+    sys.exit(1) # Exit if Razorpay client cannot initialize
 
 # Price for the Pro subscription in rupees (in the smallest currency unit, e.g., paise).
-# Default to 1 for testing, but set PRO_PRICE env var for actual production price.
-PRO_PRICE_INR = int(os.getenv("PRO_PRICE", "1")) # This is the price in whole rupees
+PRO_PRICE_INR = int(os.getenv("PRO_PRICE", "1")) # This is the price in whole rupees (ensure it's set on Render)
 PRO_PRICE_PAISE = PRO_PRICE_INR * 100 # Razorpay expects amount in paise
 
 logger.info(f"Configured PRO_PRICE: {PRO_PRICE_INR} INR ({PRO_PRICE_PAISE} paise).")
@@ -106,18 +114,39 @@ async def webhook(req: Request):
 
     logger.info(f"Webhook received. Event: '{event_type}'. Signature present: {bool(sig)}.")
 
+    # --- CRITICAL DEBUGGING LINES FOR RZP_WEBHOOK_SECRET ---
+    # These logs will show what value RZP_WEBHOOK_SECRET holds when the webhook function is called.
+    logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET type: {type(RZP_WEBHOOK_SECRET)}")
+    logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET value length: {len(RZP_WEBHOOK_SECRET) if RZP_WEBHOOK_SECRET else 0}")
+    if RZP_WEBHOOK_SECRET:
+        # Mask the secret for security in logs, but show its start/end
+        logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET (masked): {RZP_WEBHOOK_SECRET[:3]}...{RZP_WEBHOOK_SECRET[-3:]}")
+    else:
+        logger.error("DEBUG (inside webhook): RZP_WEBHOOK_SECRET is None or empty at webhook call time! This will cause verification to fail.")
+        # Raise an immediate HTTP 500 error if the secret is truly missing here
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server webhook secret is not configured correctly.")
+    # --- END CRITICAL DEBUGGING LINES ---
+
+
     # --- 1. Verify Webhook Signature ---
     # This is a critical security step to ensure the webhook is from Razorpay.
     if not sig:
-        logger.warning("Webhook received with no X-Razorpay-Signature header.")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing X-Razorpay-Signature header.")
-    
+        logger.warning("Webhook received with no X-Razorpay-Signature header. Skipping verification.")
+        # For security, you might want to raise an error here and not return 200 OK.
+        # But for debugging, we'll let it proceed to hit the verify_webhook_signature call.
+        # raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing X-Razorpay-Signature header.")
+
     try:
+        # This is the line that was causing the TypeError if RZP_WEBHOOK_SECRET was invalid
         razorpay.Utility.verify_webhook_signature(body, sig, RZP_WEBHOOK_SECRET)
         logger.info("Webhook signature verified successfully.")
     except razorpay.errors.SignatureVerificationError:
         logger.error("CRITICAL ERROR: Webhook signature verification failed! Possible tampering or incorrect secret.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad signature.") # Bad signature means reject request
+    except Exception as e:
+        logger.exception(f"CRITICAL ERROR: An unexpected exception occurred during webhook signature verification: {e}")
+        # Return 500 internal server error for other unexpected errors during verification
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal error during signature verification: {e}")
 
     data = await req.json()
 
