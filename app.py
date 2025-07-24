@@ -236,7 +236,35 @@ def load_user(uid, silent=False):
         # Fetch plan details from the record, defaulting if keys are missing
         is_pro      = rec.get("upgrade", False)
         valid_until = rec.get("pro_valid_until", 0)
-        log(f"Fetched 'upgrade': {is_pro}, 'pro_valid_until': {valid_until}")
+        plan_field  = str(rec.get("plan", "")).lower()
+        log(
+            f"Fetched 'upgrade': {is_pro}, 'pro_valid_until': {valid_until}, "
+            f"'plan': {plan_field}"
+        )
+
+        # If the plan stored in the DB explicitly says "pro" (or "premium")
+        # but the upgrade flag is missing, treat the user as upgraded. This
+        # helps when manual DB edits set only the plan field.
+        if plan_field in ("pro", "premium") and not is_pro:
+            log(
+                "Plan field indicates Pro access but upgrade flag is False – "
+                "auto-correcting database record"
+            )
+            is_pro = True
+            try:
+                # Ensure plan is normalized to "pro" and add a default expiry
+                if valid_until <= now:
+                    valid_until = int(now + 30 * 24 * 3600)
+                db.child("users").child(uid).update(
+                    {
+                        "upgrade": True,
+                        "plan": "pro",
+                        "pro_valid_until": valid_until,
+                    },
+                    token,
+                )
+            except Exception as corr_e:
+                log(f"Failed to update plan/upgrade for {uid}: {corr_e}")
 
         # If the stored expiry timestamp is in the future we should treat
         # the user as Pro even if the upgrade flag wasn't set due to a
