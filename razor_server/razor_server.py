@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 # Fetch all critical environment variables at the top
 RZP_KEY = os.getenv("RZP_KEY")
 RZP_SECRET = os.getenv("RZP_SECRET")
-RZP_WEBHOOK_SECRET = os.getenv("RZP_WEBHOOK_SECRET") # Your custom webhook secret from Razorpay dashboard
+
+# Apply .strip() immediately upon retrieval to eliminate any hidden leading/trailing whitespace
+_raw_webhook_secret = os.getenv("RZP_WEBHOOK_SECRET")
+RZP_WEBHOOK_SECRET = _raw_webhook_secret.strip() if _raw_webhook_secret else None
+
 
 # --- Critical Startup Checks for Environment Variables ---
 if not all([RZP_KEY, RZP_SECRET, RZP_WEBHOOK_SECRET]):
@@ -117,7 +121,8 @@ async def webhook(req: Request):
     # --- CRITICAL DEBUGGING LINES FOR RZP_WEBHOOK_SECRET ---
     # These logs will show what value RZP_WEBHOOK_SECRET holds when the webhook function is called.
     logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET type: {type(RZP_WEBHOOK_SECRET)}")
-    logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET value length: {len(RZP_WEBHOOK_SECRET) if RZP_WEBHOOK_SECRET else 0}")
+    # IMPORTANT: Updated log message to confirm length AFTER stripping
+    logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET value length (after strip): {len(RZP_WEBHOOK_SECRET) if RZP_WEBHOOK_SECRET else 0}")
     if RZP_WEBHOOK_SECRET:
         # Mask the secret for security in logs, but show its start/end
         logger.info(f"DEBUG (inside webhook): RZP_WEBHOOK_SECRET (masked): {RZP_WEBHOOK_SECRET[:3]}...{RZP_WEBHOOK_SECRET[-3:]}")
@@ -249,4 +254,3 @@ async def webhook(req: Request):
     # --- 6. Always Return 200 OK to Razorpay ---
     # This is crucial. If you don't return 200, Razorpay will keep retrying the webhook.
     return {"ok": True}, status.HTTP_200_OK
-
