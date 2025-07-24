@@ -1,4 +1,4 @@
 fastapi
 uvicorn
-razorpay
+razorpay==1.4.1
 firebase-admin
