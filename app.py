@@ -9,7 +9,7 @@ AI Report Analyzer – full production build (May 2025)
 • Razorpay Checkout inline (650 px iframe)
 """
 
-import os, time, tempfile, requests, streamlit as st, threading
+import os, time, tempfile, requests, streamlit as st, threading, base64
 import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, numpy as np, fitz, openai, pyrebase
 import traceback, sys
 from io import BytesIO
@@ -615,34 +615,30 @@ def export_pdf(insights, paths):
     return BytesIO(pdf.output(dest="S").encode("latin-1"))
 
 # ----------------------------------------------------------------------
-def send_email(to_addr: str, insights: str, paths: list[str]) -> bool:
-    """Send chart insights via SMTP using env configuration."""
+def send_email(to_addrs, subject: str, body: str, attachments: list[tuple[str, bytes, str]]) -> bool:
+    """Send an email with arbitrary attachments via SMTP."""
     server = os.getenv("SMTP_SERVER")
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER")
     pwd = os.getenv("SMTP_PASSWORD")
-    if not (server and user and pwd and to_addr):
+    if not (server and user and pwd and to_addrs):
         return False
 
     from email.message import EmailMessage
     import smtplib
 
     msg = EmailMessage()
-    msg["Subject"] = "Chart Insights"
+    msg["Subject"] = subject or "Report"
     msg["From"] = user
-    msg["To"] = to_addr
-    msg.set_content(insights or "No significant insights")
+    if isinstance(to_addrs, str):
+        to_addrs = [to_addrs]
+    msg["To"] = ", ".join(to_addrs)
+    msg.set_content(body or "No significant insights")
 
-    for p in paths:
+    for name, data, mime in attachments:
         try:
-            with open(p, "rb") as f:
-                data = f.read()
-            msg.add_attachment(
-                data,
-                maintype="image",
-                subtype="png",
-                filename=os.path.basename(p),
-            )
+            main, sub = mime.split("/", 1)
+            msg.add_attachment(data, maintype=main, subtype=sub, filename=name)
         except Exception:
             continue
 
@@ -656,15 +652,56 @@ def send_email(to_addr: str, insights: str, paths: list[str]) -> bool:
         return False
 
 
-def schedule_email(to_addr: str, insights: str, paths: list[str], when: datetime):
-    """Schedule an email to be sent at a later time."""
-    delay = max(0, (when - datetime.now()).total_seconds())
+def generate_insight_title(text: str) -> str:
+    """Return a short formal title for the given insights using OpenAI."""
+    prompt = (
+        "Create a short formal title (max 5 words) for these insights:\n" + text[:500]
+    )
+    try:
+        resp = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=10,
+        )
+        return resp["choices"][0]["message"]["content"].strip()
+    except Exception:
+        return "Insights Report"
 
-    def job():
-        time.sleep(delay)
-        send_email(to_addr, insights, paths)
 
-    threading.Thread(target=job, daemon=True).start()
+def schedule_email(to_addrs: list[str], insights: str, csv: bytes, pdf: bytes, when: datetime):
+    """Persist an email schedule in the database for background delivery."""
+    uid = get_current_uid()
+    if not uid:
+        return
+
+    token = S.get("token")
+    try:
+        scheduled = db.child("users").child(uid).child("scheduled_emails").get(token).val() or {}
+    except Exception:
+        scheduled = {}
+
+    report_count = len(scheduled)
+    email_count = sum(len(v.get("emails", [])) for v in scheduled.values())
+    if report_count >= 20 or email_count + len(to_addrs) > 50:
+        st.error("Schedule limit reached (20 reports / 50 emails).")
+        return
+
+    title = generate_insight_title(insights)
+    event = {
+        "emails": to_addrs,
+        "title": title,
+        "insights": insights,
+        "csv": base64.b64encode(csv).decode(),
+        "pdf": base64.b64encode(pdf).decode(),
+        "send_at": int(when.timestamp()),
+        "created": int(time.time()),
+    }
+
+    try:
+        db.child("users").child(uid).child("scheduled_emails").push(event, token)
+        st.success("Email scheduled.")
+    except Exception as e:
+        st.error(f"Failed to schedule email: {e}")
 # ----------------------------------------------------------------------
 
 def expression_builder(expr_key: str, dims: list[str], metrics: list[str]):
@@ -1124,6 +1161,12 @@ def custom_insights_page():
         st.write(f"Email: {S.get('email', '')}")
         st.write(f"Plan: {user_rec.get('plan', 'free')}")
         st.write(f"Reports used: {user_rec.get('report_count', 0)}")
+        sched = user_rec.get('scheduled_emails', {})
+        if sched:
+            st.write("Scheduled Emails:")
+            for v in sched.values():
+                when = datetime.fromtimestamp(v.get('send_at', 0))
+                st.write(f"- {', '.join(v.get('emails', []))} at {when}")
 
         if saved:
             names = list(saved.keys())
@@ -1281,12 +1324,14 @@ def custom_insights_page():
         )
 
     with st.expander("Schedule Email"):
-        to_email = st.text_input("Send to Email", key="sched_email")
+        to_email = st.text_input("Send to Emails (comma separated)", key="sched_email")
         send_time = st.time_input("Send at", datetime.now().time())
         if st.button("Schedule Email") and to_email and S["custom_chart_paths"]:
             when = datetime.combine(datetime.now().date(), send_time)
-            schedule_email(to_email, S["custom_insights"], S["custom_chart_paths"], when)
-            st.success("Email scheduled.")
+            emails = [e.strip() for e in to_email.split(',') if e.strip()]
+            csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
+            pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
+            schedule_email(emails, S["custom_insights"], csv_data, pdf_data, when)
 
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
