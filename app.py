@@ -645,6 +645,12 @@ def schedule_email(to_addr: str, insights: str, paths: list[str], when: datetime
 def expression_builder(expr_key: str, dims: list[str], metrics: list[str]):
     """Interactive helper for building expressions."""
 
+    # Ensure the expression key exists to avoid assignment errors when
+    # widgets are used before any value has been set. Streamlit will raise a
+    # ``StreamlitAPIException`` if we try to assign to a non-existent key
+    # in some situations, so initialise it with an empty string.
+    st.session_state.setdefault(expr_key, "")
+
     st.markdown("**Available Fields**")
     sel_field = st.selectbox(
         "Field", dims + metrics, key=f"{expr_key}_field"
