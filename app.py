@@ -655,20 +655,26 @@ def expression_builder(expr_key: str, dims: list[str], metrics: list[str]):
     sel_field = st.selectbox(
         "Field", dims + metrics, key=f"{expr_key}_field"
     )
-    if st.button("Insert Field", key=f"{expr_key}_field_btn"):
+    def _insert_field():
         st.session_state[expr_key] = (
             st.session_state.get(expr_key, "") + f"{sel_field} "
         )
+    st.button("Insert Field", key=f"{expr_key}_field_btn", on_click=_insert_field)
 
     st.markdown("**Functions**")
     funcs = ["sum", "mean", "count", "max", "min", "abs", "round"]
     sel_func = st.selectbox(
         "Function", funcs, key=f"{expr_key}_func"
     )
-    if st.button("Insert Function", key=f"{expr_key}_func_btn"):
+    def _insert_func():
         st.session_state[expr_key] = (
             st.session_state.get(expr_key, "") + f"{sel_func}("
         )
+    st.button(
+        "Insert Function",
+        key=f"{expr_key}_func_btn",
+        on_click=_insert_func,
+    )
 
     st.markdown("**Symbols**: `+` `-` `*` `/` `(` `)`")
 def open_razorpay(email) -> bool:
