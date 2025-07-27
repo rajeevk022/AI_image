@@ -9,7 +9,7 @@ AI Report Analyzer – full production build (May 2025)
 • Razorpay Checkout inline (650 px iframe)
 """
 
-import os, time, tempfile, requests, streamlit as st
+import os, time, tempfile, requests, streamlit as st, threading
 import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, numpy as np, fitz, openai, pyrebase
 import traceback, sys
 from io import BytesIO
@@ -186,6 +186,8 @@ if "S" not in st.session_state:
         "page": "login",
         "insights": "",
         "chart_paths": [],
+        "custom_insights": "",
+        "custom_chart_paths": [],
         "df": pd.DataFrame(),
         "pdf_text": "",
     }
@@ -483,6 +485,29 @@ def auto_charts(df):
         fig.savefig(p, dpi=220)
         paths.append(p)
     return charts[:5], paths
+
+# ----------------------------------------------------------------------
+def generate_chart_insights(chart_type: str, data: pd.DataFrame) -> str:
+    """Return 5-50 sentence insight summary for a chart."""
+    try:
+        desc = data.describe(include="all").to_csv()
+        prompt = (
+            "Provide concise insights (between 5 and 50 sentences) for a "
+            f"{chart_type} chart based on the following summary:\n{desc}"
+            " If there are no notable insights reply with 'No significant insights.'"
+        )
+        resp = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+        )["choices"][0]["message"]["content"].strip()
+        if resp.lower().startswith("no significant"):
+            return "No significant insights."
+        if len(resp.split(".")) < 5:
+            return "No significant insights."
+        return resp
+    except Exception:
+        return "No significant insights."
 # ----------------------------------------------------------------------
 def to_latin1(text: str) -> str:
     return text.encode("latin-1", "replace").decode("latin-1")
@@ -560,6 +585,58 @@ def export_pdf(insights, paths):
         pdf.add_page()
         pdf.image(p, x=10, y=30, w=180)
     return BytesIO(pdf.output(dest="S").encode("latin-1"))
+
+# ----------------------------------------------------------------------
+def send_email(to_addr: str, insights: str, paths: list[str]) -> bool:
+    """Send chart insights via SMTP using env configuration."""
+    server = os.getenv("SMTP_SERVER")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER")
+    pwd = os.getenv("SMTP_PASSWORD")
+    if not (server and user and pwd and to_addr):
+        return False
+
+    from email.message import EmailMessage
+    import smtplib
+
+    msg = EmailMessage()
+    msg["Subject"] = "Chart Insights"
+    msg["From"] = user
+    msg["To"] = to_addr
+    msg.set_content(insights or "No significant insights")
+
+    for p in paths:
+        try:
+            with open(p, "rb") as f:
+                data = f.read()
+            msg.add_attachment(
+                data,
+                maintype="image",
+                subtype="png",
+                filename=os.path.basename(p),
+            )
+        except Exception:
+            continue
+
+    try:
+        with smtplib.SMTP(server, port) as s:
+            s.starttls()
+            s.login(user, pwd)
+            s.send_message(msg)
+        return True
+    except Exception:
+        return False
+
+
+def schedule_email(to_addr: str, insights: str, paths: list[str], when: datetime):
+    """Schedule an email to be sent at a later time."""
+    delay = max(0, (when - datetime.now()).total_seconds())
+
+    def job():
+        time.sleep(delay)
+        send_email(to_addr, insights, paths)
+
+    threading.Thread(target=job, daemon=True).start()
 # ----------------------------------------------------------------------
 def open_razorpay(email) -> bool:
     if not (RZP_SERVER and RZP_KEY_ID):
@@ -1007,13 +1084,23 @@ def custom_insights_page():
     st.subheader("Fields")
     c1, c2 = st.columns(2)
     with c1:
-        rows = st.multiselect("Rows", dims)
+        rows = st.multiselect("Rows", dims, key="rows_sel")
     with c2:
-        cols = st.multiselect("Columns", metrics)
+        cols = st.multiselect("Columns", metrics, key="cols_sel")
 
     chart = st.selectbox(
         "Chart Type",
-        ["Bar", "Line", "Area", "Scatter", "Histogram"],
+        [
+            "Bar",
+            "Line",
+            "Area",
+            "Scatter",
+            "Histogram",
+            "Heatmap",
+            "Pie",
+            "Box",
+            "Violin",
+        ],
     )
 
     # --- Grouping ---------------------------------------------------------
@@ -1029,26 +1116,65 @@ def custom_insights_page():
             )
             st.dataframe(grouped)
 
-    if st.button("Generate Chart") and rows and cols:
-        data = (
-            df.groupby(rows)[cols]
-            .sum()
-            .reset_index()
-        )
+    if rows and cols:
+        data = df.groupby(rows)[cols].sum().reset_index()
         fig = plt.figure()
-        x = data[rows[0]]
-        y = data[cols[0]]
-        if chart == "Bar":
-            sns.barplot(x=x, y=y)
-        elif chart == "Line":
-            sns.lineplot(x=x, y=y)
-        elif chart == "Area":
-            plt.fill_between(x, y, alpha=0.5)
-        elif chart == "Scatter":
-            sns.scatterplot(x=x, y=y)
-        else:  # Histogram
-            sns.histplot(y)
+        if chart == "Heatmap" and len(rows) >= 2 and len(cols) == 1:
+            pivot = df.pivot_table(index=rows[0], columns=rows[1], values=cols[0], aggfunc="sum")
+            sns.heatmap(pivot, annot=True, cmap="RdPu")
+        elif chart == "Pie" and len(rows) == 1 and len(cols) == 1:
+            plt.pie(data[cols[0]], labels=data[rows[0]], autopct="%1.1f%%")
+        elif chart == "Box" and len(rows) == 1:
+            for c in cols:
+                sns.boxplot(x=data[rows[0]], y=data[c])
+        elif chart == "Violin" and len(rows) == 1:
+            for c in cols:
+                sns.violinplot(x=data[rows[0]], y=data[c])
+        else:
+            x = data[rows[0]]
+            for c in cols:
+                if chart == "Bar":
+                    plt.bar(x, data[c], label=c)
+                elif chart == "Line":
+                    plt.plot(x, data[c], label=c)
+                elif chart == "Area":
+                    plt.fill_between(x, data[c], alpha=0.5, label=c)
+                elif chart == "Scatter":
+                    plt.scatter(x, data[c], label=c)
+                elif chart == "Histogram":
+                    sns.histplot(data[c], label=c, kde=False)
+            plt.legend()
         st.pyplot(fig)
+        p = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+        fig.savefig(p, dpi=220)
+        S["custom_chart_paths"] = [p]
+        insight = generate_chart_insights(chart, data)
+        S["custom_insights"] = insight
+        st.markdown(insight)
+    else:
+        st.info("Select at least one row and one column to plot.")
+
+    if S["custom_chart_paths"]:
+        st.download_button(
+            "Export Chart & Insights (Excel)",
+            data=export_excel(df, S["custom_insights"], S["custom_chart_paths"]),
+            file_name="custom_chart.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        st.download_button(
+            "Export Chart & Insights (PDF)",
+            data=export_pdf(S["custom_insights"], S["custom_chart_paths"]),
+            file_name="custom_chart.pdf",
+            mime="application/pdf",
+        )
+
+    with st.expander("Schedule Email"):
+        to_email = st.text_input("Send to Email", key="sched_email")
+        send_time = st.time_input("Send at", datetime.now().time())
+        if st.button("Schedule Email") and to_email and S["custom_chart_paths"]:
+            when = datetime.combine(datetime.now().date(), send_time)
+            schedule_email(to_email, S["custom_insights"], S["custom_chart_paths"], when)
+            st.success("Email scheduled.")
 
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
