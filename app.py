@@ -192,6 +192,9 @@ if "S" not in st.session_state:
         "pdf_text": "",
     }
 S = st.session_state.S
+# Toggle flags for the expression builder UI
+st.session_state.setdefault("show_calc_builder", False)
+st.session_state.setdefault("show_param_builder", False)
 # ────────────────────────────────────────────────────────────────────────
 
 def get_current_uid():
@@ -638,6 +641,30 @@ def schedule_email(to_addr: str, insights: str, paths: list[str], when: datetime
 
     threading.Thread(target=job, daemon=True).start()
 # ----------------------------------------------------------------------
+
+def expression_builder(expr_key: str, dims: list[str], metrics: list[str]):
+    """Interactive helper for building expressions."""
+
+    st.markdown("**Available Fields**")
+    sel_field = st.selectbox(
+        "Field", dims + metrics, key=f"{expr_key}_field"
+    )
+    if st.button("Insert Field", key=f"{expr_key}_field_btn"):
+        st.session_state[expr_key] = (
+            st.session_state.get(expr_key, "") + f"{sel_field} "
+        )
+
+    st.markdown("**Functions**")
+    funcs = ["sum", "mean", "count", "max", "min", "abs", "round"]
+    sel_func = st.selectbox(
+        "Function", funcs, key=f"{expr_key}_func"
+    )
+    if st.button("Insert Function", key=f"{expr_key}_func_btn"):
+        st.session_state[expr_key] = (
+            st.session_state.get(expr_key, "") + f"{sel_func}("
+        )
+
+    st.markdown("**Symbols**: `+` `-` `*` `/` `(` `)`")
 def open_razorpay(email) -> bool:
     if not (RZP_SERVER and RZP_KEY_ID):
         st.error("Payment server not configured.")
@@ -1061,6 +1088,10 @@ def custom_insights_page():
         calc_expr = st.text_input(
             "Pandas expression (e.g. col1 + col2)", key="calc_expr"
         )
+        if st.button("Calculations", key="calc_builder_btn"):
+            st.session_state.show_calc_builder = not st.session_state.show_calc_builder
+        if st.session_state.show_calc_builder:
+            expression_builder("calc_expr", dims, metrics)
         if st.button("Add Field") and calc_name and calc_expr:
             try:
                 df[calc_name] = df.eval(calc_expr)
@@ -1075,7 +1106,11 @@ def custom_insights_page():
     # --- Parameters -------------------------------------------------------
     with st.expander("⚙️ Parameters"):
         p_name = st.text_input("Parameter name")
-        p_val = st.text_input("Value")
+        p_val = st.text_input("Value", key="p_val")
+        if st.button("Calculations", key="param_builder_btn"):
+            st.session_state.show_param_builder = not st.session_state.show_param_builder
+        if st.session_state.show_param_builder:
+            expression_builder("p_val", dims, metrics)
         if st.button("Set Parameter") and p_name:
             S.setdefault("params", {})[p_name] = p_val
             st.success(f"Set parameter '{p_name}' = {p_val}")
