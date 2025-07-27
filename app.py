@@ -933,6 +933,10 @@ def show_results():
         else:
             st.warning("Please enter a prompt before generating.")
 
+    if st.button("Create Custom Insights", key="create_custom_btn"):
+        S["page"] = "custom"
+        st.rerun()
+
     st.write(S["insights"])
     if S["chart_paths"]:
         st.subheader("📊 Charts")
@@ -952,8 +956,47 @@ def show_results():
         file_name="ai_report.pdf",
         mime="application/pdf",
     )
+
+def custom_insights_page():
+    """Interactive builder for custom charts."""
+    st.title("\U0001F4C8 Custom Insights Builder")
+
+    if S["df"].empty:
+        st.warning("Upload a dataset on the Dashboard first.")
+        if st.button("Back to Dashboard"):
+            S["page"] = "dash"
+            st.rerun()
+        return
+
+    df = S["df"]
+    dims = [c for c in df.columns if df[c].dtype == object]
+    metrics = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        dim = st.selectbox("Dimension", dims)
+    with col2:
+        metric = st.selectbox("Metric", metrics)
+
+    chart = st.selectbox("Chart Type", ["Bar", "Line", "Area"])
+
+    if st.button("Generate Chart"):
+        fig = plt.figure()
+        if chart == "Bar":
+            sns.barplot(x=df[dim], y=df[metric])
+        elif chart == "Line":
+            sns.lineplot(x=df[dim], y=df[metric])
+        else:
+            plt.fill_between(df[dim], df[metric], alpha=0.5)
+        st.pyplot(fig)
+
+    if st.button("Back", key="back_btn"):
+        S["page"] = "dash"
+        st.rerun()
 # ----------------------------------------------------------------------
 if S["page"] == "login":
     login_screen()
+elif S["page"] == "custom":
+    custom_insights_page()
 else:
     dashboard()
