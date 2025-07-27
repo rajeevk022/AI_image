@@ -38,6 +38,12 @@ Run the Razorpay webhook/order server:
 uvicorn razor_server.razor_server:app
 ```
 
+To deliver scheduled emails, run the background scheduler in another process:
+
+```bash
+python email_scheduler.py
+```
+
 ## UID Based Storage
 
 User records are stored in Firebase under `users/<uid>`. If you previously stored data keyed by email, create entries under the UID and copy the values over, then delete the old email-keyed nodes. This keeps all data in a single UID namespace.
