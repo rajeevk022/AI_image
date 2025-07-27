@@ -419,6 +419,31 @@ def inc_usage():
     S["used"] = new_used
 
 # ----------------------------------------------------------------------
+def fetch_saved_insights() -> dict:
+    """Return dict of saved custom insights for the logged in user."""
+    uid = get_current_uid()
+    if not uid:
+        return {}
+    try:
+        token = S.get("token")
+        rec = db.child("users").child(uid).child("insights").get(token).val()
+        return rec if isinstance(rec, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_custom_insight(name: str, config: dict):
+    """Persist a custom insight configuration for the logged in user."""
+    uid = get_current_uid()
+    if not uid or not name:
+        return
+    try:
+        token = S.get("token")
+        db.child("users").child(uid).child("insights").child(name).set(config, token)
+    except Exception as e:  # noqa: BLE001
+        st.error(f"Failed to save insight: {e}")
+
+# ----------------------------------------------------------------------
 def numberify(text: str) -> str:
     """Format raw insight text into numbered sentences."""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -1083,6 +1108,34 @@ def custom_insights_page():
     """
     st.title("\U0001F4C8 Custom Insights Builder")
 
+    # --- User info and saved insights ---------------------------------
+    uid = get_current_uid()
+    user_rec = {}
+    if uid:
+        try:
+            token = S.get("token")
+            user_rec = db.child("users").child(uid).get(token).val() or {}
+        except Exception:
+            user_rec = {}
+
+    saved = fetch_saved_insights() if uid else {}
+
+    with st.expander("User Info"):
+        st.write(f"Email: {S.get('email', '')}")
+        st.write(f"Plan: {user_rec.get('plan', 'free')}")
+        st.write(f"Reports used: {user_rec.get('report_count', 0)}")
+
+        if saved:
+            names = list(saved.keys())
+            choice = st.selectbox("Saved Insights", names, key="saved_list")
+            if st.button("Load Insight", key="load_saved"):
+                data = saved.get(choice, {})
+                st.session_state.rows_sel = data.get('rows', [])
+                st.session_state.cols_sel = data.get('cols', [])
+                st.session_state.chart_type = data.get('chart', 'Bar')
+                S["custom_insights"] = data.get('insight', '')
+                st.experimental_rerun()
+
     if S["df"].empty:
         st.warning("Upload a dataset on the Dashboard first.")
         if st.button("Back to Dashboard"):
@@ -1148,6 +1201,7 @@ def custom_insights_page():
             "Box",
             "Violin",
         ],
+        key="chart_type",
     )
 
     # --- Grouping ---------------------------------------------------------
@@ -1198,6 +1252,17 @@ def custom_insights_page():
         insight = generate_chart_insights(chart, data)
         S["custom_insights"] = insight
         st.markdown(insight)
+        in_name = st.text_input("Insight Name", key="insight_name")
+        if st.button("Save", key="save_insight") and in_name:
+            cfg = {
+                "rows": rows,
+                "cols": cols,
+                "chart": chart,
+                "insight": insight,
+                "created": int(time.time()),
+            }
+            save_custom_insight(in_name, cfg)
+            st.success("Insight saved")
     else:
         st.info("Select at least one row and one column to plot.")
 
