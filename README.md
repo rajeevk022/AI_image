@@ -8,7 +8,9 @@
   set the upgrade flag, the app now corrects it whenever it detects a valid Pro
   expiry timestamp. A "Payment successful" message appears once the upgrade takes
   effect. For testing, the subscription charge is set to **₹1**.
-- Build custom charts using the new **Custom Insights** page.
+- Build custom charts using the new **Custom Insights** page. The page now
+  supports Tableau-style multiselect fields for rows and columns along with
+  calculated fields, groups and parameters.
 
 ## Environment Variables
 
