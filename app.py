@@ -969,7 +969,7 @@ def dashboard():
                     S["just_upgraded"] = True
 
                     S["upgrade_in_progress"] = False
-                    st.experimental_rerun()
+                    st.rerun()
             st.warning(
                 "Payment not confirmed yet. If you completed the payment, please refresh."
             )
@@ -1134,7 +1134,7 @@ def custom_insights_page():
                 st.session_state.cols_sel = data.get('cols', [])
                 st.session_state.chart_type = data.get('chart', 'Bar')
                 S["custom_insights"] = data.get('insight', '')
-                st.experimental_rerun()
+                st.rerun()
 
     if S["df"].empty:
         st.warning("Upload a dataset on the Dashboard first.")
