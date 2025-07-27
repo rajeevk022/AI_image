@@ -958,7 +958,13 @@ def show_results():
     )
 
 def custom_insights_page():
-    """Interactive builder for custom charts."""
+    """Interactive builder for custom charts.
+
+    The UI mimics a drag and drop experience using multiselect widgets so users
+    can pick dimensions and metrics for rows and columns. It also supports
+    simple calculated fields, grouping and parameters without any extra
+    dependencies.
+    """
     st.title("\U0001F4C8 Custom Insights Builder")
 
     if S["df"].empty:
@@ -972,22 +978,76 @@ def custom_insights_page():
     dims = [c for c in df.columns if df[c].dtype == object]
     metrics = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
 
-    col1, col2 = st.columns(2)
-    with col1:
-        dim = st.selectbox("Dimension", dims)
-    with col2:
-        metric = st.selectbox("Metric", metrics)
+    # --- Calculated fields -------------------------------------------------
+    with st.expander("➕ Add Calculated Field"):
+        calc_name = st.text_input("Field name")
+        calc_expr = st.text_input(
+            "Pandas expression (e.g. col1 + col2)", key="calc_expr"
+        )
+        if st.button("Add Field") and calc_name and calc_expr:
+            try:
+                df[calc_name] = df.eval(calc_expr)
+                if pd.api.types.is_numeric_dtype(df[calc_name]):
+                    metrics.append(calc_name)
+                else:
+                    dims.append(calc_name)
+                st.success(f"Added calculated field '{calc_name}'")
+            except Exception as e:  # noqa: BLE001
+                st.error(f"Error computing field: {e}")
 
-    chart = st.selectbox("Chart Type", ["Bar", "Line", "Area"])
+    # --- Parameters -------------------------------------------------------
+    with st.expander("⚙️ Parameters"):
+        p_name = st.text_input("Parameter name")
+        p_val = st.text_input("Value")
+        if st.button("Set Parameter") and p_name:
+            S.setdefault("params", {})[p_name] = p_val
+            st.success(f"Set parameter '{p_name}' = {p_val}")
 
-    if st.button("Generate Chart"):
+    # --- Select rows/columns ---------------------------------------------
+    st.subheader("Fields")
+    c1, c2 = st.columns(2)
+    with c1:
+        rows = st.multiselect("Rows", dims)
+    with c2:
+        cols = st.multiselect("Columns", metrics)
+
+    chart = st.selectbox(
+        "Chart Type",
+        ["Bar", "Line", "Area", "Scatter", "Histogram"],
+    )
+
+    # --- Grouping ---------------------------------------------------------
+    with st.expander("📂 Groups"):
+        grp_dim = st.selectbox("Group by", ["None"] + dims, index=0)
+        agg_metric = st.selectbox("Aggregate", metrics)
+        agg_func = st.selectbox("Function", ["sum", "mean", "count", "max", "min"])
+        if st.button("Create Group") and grp_dim != "None":
+            grouped = (
+                df.groupby(grp_dim)[agg_metric]
+                .agg(agg_func)
+                .reset_index()
+            )
+            st.dataframe(grouped)
+
+    if st.button("Generate Chart") and rows and cols:
+        data = (
+            df.groupby(rows)[cols]
+            .sum()
+            .reset_index()
+        )
         fig = plt.figure()
+        x = data[rows[0]]
+        y = data[cols[0]]
         if chart == "Bar":
-            sns.barplot(x=df[dim], y=df[metric])
+            sns.barplot(x=x, y=y)
         elif chart == "Line":
-            sns.lineplot(x=df[dim], y=df[metric])
-        else:
-            plt.fill_between(df[dim], df[metric], alpha=0.5)
+            sns.lineplot(x=x, y=y)
+        elif chart == "Area":
+            plt.fill_between(x, y, alpha=0.5)
+        elif chart == "Scatter":
+            sns.scatterplot(x=x, y=y)
+        else:  # Histogram
+            sns.histplot(y)
         st.pyplot(fig)
 
     if st.button("Back", key="back_btn"):
