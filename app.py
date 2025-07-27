@@ -15,6 +15,7 @@ import traceback, sys
 from io import BytesIO
 from dotenv import load_dotenv
 from datetime import datetime, timezone   # ← missing import added
+from zoneinfo import ZoneInfo, available_timezones
 from firebase_config import firebase_config
 # ────────────────────────────────────────────────────────────────────────
 load_dotenv()
@@ -668,7 +669,7 @@ def generate_insight_title(text: str) -> str:
         return "Insights Report"
 
 
-def schedule_email(to_addrs: list[str], insights: str, csv: bytes, pdf: bytes, when: datetime):
+def schedule_email(to_addrs: list[str], insights: str, csv: bytes, pdf: bytes, when: datetime, tz_name: str):
     """Persist an email schedule in the database for background delivery."""
     uid = get_current_uid()
     if not uid:
@@ -694,6 +695,7 @@ def schedule_email(to_addrs: list[str], insights: str, csv: bytes, pdf: bytes, w
         "csv": base64.b64encode(csv).decode(),
         "pdf": base64.b64encode(pdf).decode(),
         "send_at": int(when.timestamp()),
+        "tz": tz_name,
         "created": int(time.time()),
     }
 
@@ -1165,8 +1167,11 @@ def custom_insights_page():
         if sched:
             st.write("Scheduled Emails:")
             for v in sched.values():
-                when = datetime.fromtimestamp(v.get('send_at', 0))
-                st.write(f"- {', '.join(v.get('emails', []))} at {when}")
+                tz_name = v.get('tz', 'UTC')
+                tz = ZoneInfo(tz_name)
+                when = datetime.fromtimestamp(v.get('send_at', 0), tz=timezone.utc).astimezone(tz)
+                ts = when.strftime('%Y-%m-%d %H:%M')
+                st.write(f"- {', '.join(v.get('emails', []))} at {ts} ({tz_name})")
 
         if saved:
             names = list(saved.keys())
@@ -1326,12 +1331,18 @@ def custom_insights_page():
     with st.expander("Schedule Email"):
         to_email = st.text_input("Send to Emails (comma separated)", key="sched_email")
         send_time = st.time_input("Send at", datetime.now().time())
+        tz_names = sorted(available_timezones())
+        local_tz = str(datetime.now().astimezone().tzinfo)
+        tz_idx = tz_names.index(local_tz) if local_tz in tz_names else tz_names.index("UTC")
+        tz_choice = st.selectbox("Timezone", tz_names, index=tz_idx)
         if st.button("Schedule Email") and to_email and S["custom_chart_paths"]:
-            when = datetime.combine(datetime.now().date(), send_time)
+            local_zone = ZoneInfo(tz_choice)
+            when_local = datetime.combine(datetime.now(local_zone).date(), send_time, tzinfo=local_zone)
+            when = when_local.astimezone(timezone.utc)
             emails = [e.strip() for e in to_email.split(',') if e.strip()]
             csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
             pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
-            schedule_email(emails, S["custom_insights"], csv_data, pdf_data, when)
+            schedule_email(emails, S["custom_insights"], csv_data, pdf_data, when, tz_choice)
 
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
