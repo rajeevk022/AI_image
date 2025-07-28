@@ -16,7 +16,13 @@ from io import BytesIO
 from dotenv import load_dotenv
 from datetime import datetime, timezone   # ← missing import added
 from zoneinfo import ZoneInfo, available_timezones
+# ────────────────────────────────────────────────────────────────────────
 from firebase_config import firebase_config
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────────────────
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -623,6 +629,12 @@ def send_email(to_addrs, subject: str, body: str, attachments: list[tuple[str, b
     user = os.getenv("SMTP_USER")
     pwd = os.getenv("SMTP_PASSWORD")
     if not (server and user and pwd and to_addrs):
+        logger.error(
+            "Missing SMTP configuration or recipients: server=%s user=%s to=%s",
+            server,
+            user,
+            to_addrs,
+        )
         return False
 
     from email.message import EmailMessage
@@ -656,7 +668,9 @@ def send_email(to_addrs, subject: str, body: str, attachments: list[tuple[str, b
                 s.send_message(msg)
         return True
     except Exception as e:
-        print("Email send error", e)
+        logger.exception(
+            "Failed to send email via %s:%s as %s", server, port, user
+        )
         return False
 
 
@@ -1364,7 +1378,7 @@ def custom_insights_page():
             if success:
                 st.success("Email sent")
             else:
-                st.error("Failed to send email")
+                st.error("Failed to send email. Check logs for details.")
 
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
