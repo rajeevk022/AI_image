@@ -29,6 +29,16 @@ Set the following variables before starting the app:
 - `SMTP_PASSWORD` – password for SMTP authentication.
 - `SMTP_SSL` – set to `1` to use SMTPS (optional).
 
+Example `.env` section for sending mail via Gmail:
+
+```env
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=your.address@gmail.com
+SMTP_PASSWORD=your_app_password
+SMTP_SSL=1
+```
+
 You can place these values in a `.env` file in the project root. Both the
 Streamlit app and the background email scheduler load this file automatically.
 

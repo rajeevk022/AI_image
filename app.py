@@ -659,7 +659,14 @@ def send_email(
         return False, err
 
     if not (server and user and pwd):
-        err = "Missing SMTP configuration"
+        missing = []
+        if not server:
+            missing.append("SMTP_SERVER")
+        if not user:
+            missing.append("SMTP_USER")
+        if not pwd:
+            missing.append("SMTP_PASSWORD")
+        err = "Missing SMTP configuration: " + ", ".join(missing)
         logger.error(err + ": server=%s user=%s", server, user)
         return False, err
 
