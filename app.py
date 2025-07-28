@@ -1344,6 +1344,21 @@ def custom_insights_page():
             pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
             schedule_email(emails, S["custom_insights"], csv_data, pdf_data, when, tz_choice)
 
+        if st.button("Send Email Now") and to_email and S["custom_chart_paths"]:
+            emails = [e.strip() for e in to_email.split(',') if e.strip()]
+            csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
+            pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
+            subject = generate_insight_title(S["custom_insights"])
+            attachments = [
+                ("report.csv", csv_data, "text/csv"),
+                ("report.pdf", pdf_data, "application/pdf"),
+            ]
+            success = send_email(emails, subject, S["custom_insights"], attachments)
+            if success:
+                st.success("Email sent")
+            else:
+                st.error("Failed to send email")
+
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
         st.rerun()
