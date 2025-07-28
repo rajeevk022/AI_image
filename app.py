@@ -622,20 +622,27 @@ def export_pdf(insights, paths):
     return BytesIO(pdf.output(dest="S").encode("latin-1"))
 
 # ----------------------------------------------------------------------
-def send_email(to_addrs, subject: str, body: str, attachments: list[tuple[str, bytes, str]]) -> bool:
-    """Send an email with arbitrary attachments via SMTP."""
+def send_email(
+    to_addrs, subject: str, body: str, attachments: list[tuple[str, bytes, str]]
+) -> tuple[bool, str | None]:
+    """Send an email with arbitrary attachments via SMTP.
+
+    Returns a tuple ``(success, error_message)`` so callers can surface the
+    specific reason when sending fails.
+    """
     server = os.getenv("SMTP_SERVER")
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER")
     pwd = os.getenv("SMTP_PASSWORD")
     if not (server and user and pwd and to_addrs):
+        err = "Missing SMTP configuration or recipients"
         logger.error(
-            "Missing SMTP configuration or recipients: server=%s user=%s to=%s",
+            err + ": server=%s user=%s to=%s",
             server,
             user,
             to_addrs,
         )
-        return False
+        return False, err
 
     from email.message import EmailMessage
     import smtplib
@@ -666,12 +673,12 @@ def send_email(to_addrs, subject: str, body: str, attachments: list[tuple[str, b
                 s.starttls()
                 s.login(user, pwd)
                 s.send_message(msg)
-        return True
+        return True, None
     except Exception as e:
         logger.exception(
             "Failed to send email via %s:%s as %s", server, port, user
         )
-        return False
+        return False, str(e)
 
 
 def generate_insight_title(text: str) -> str:
@@ -1374,11 +1381,13 @@ def custom_insights_page():
                 ("report.csv", csv_data, "text/csv"),
                 ("report.pdf", pdf_data, "application/pdf"),
             ]
-            success = send_email(emails, subject, S["custom_insights"], attachments)
+            success, err = send_email(
+                emails, subject, S["custom_insights"], attachments
+            )
             if success:
                 st.success("Email sent")
             else:
-                st.error("Failed to send email. Check logs for details.")
+                st.error(f"Failed to send email: {err}")
 
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
