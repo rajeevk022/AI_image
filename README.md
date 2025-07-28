@@ -29,6 +29,9 @@ Set the following variables before starting the app:
 - `SMTP_PASSWORD` – password for SMTP authentication.
 - `SMTP_SSL` – set to `1` to use SMTPS (optional).
 
+Email recipients entered in the UI must be valid addresses. Invalid addresses
+will be highlighted before sending or scheduling.
+
 ## Running Locally
 
 Start the Streamlit UI:
