@@ -644,12 +644,19 @@ def send_email(to_addrs, subject: str, body: str, attachments: list[tuple[str, b
             continue
 
     try:
-        with smtplib.SMTP(server, port) as s:
-            s.starttls()
-            s.login(user, pwd)
-            s.send_message(msg)
+        use_ssl = os.getenv("SMTP_SSL", "0") == "1" or port == 465
+        if use_ssl:
+            with smtplib.SMTP_SSL(server, port) as s:
+                s.login(user, pwd)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(server, port) as s:
+                s.starttls()
+                s.login(user, pwd)
+                s.send_message(msg)
         return True
-    except Exception:
+    except Exception as e:
+        print("Email send error", e)
         return False
 
 
