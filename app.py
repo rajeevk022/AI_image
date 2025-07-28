@@ -643,6 +643,15 @@ def send_email(
     user = os.getenv("SMTP_USER")
     pwd = os.getenv("SMTP_PASSWORD")
 
+    # Load variables from a .env file if they weren't set already. This allows
+    # ``send_email`` to be imported in isolation without the rest of ``app``
+    # having run ``load_dotenv()`` beforehand.
+    if not (server and user and pwd):
+        load_dotenv()
+        server = server or os.getenv("SMTP_SERVER")
+        user = user or os.getenv("SMTP_USER")
+        pwd = pwd or os.getenv("SMTP_PASSWORD")
+
     if isinstance(to_addrs, str):
         to_addrs = [to_addrs]
     to_addrs = [e for e in to_addrs if e]
