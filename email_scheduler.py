@@ -28,13 +28,17 @@ while True:
                     if ev.get("pdf"):
                         attachments.append(("report.pdf", base64.b64decode(ev["pdf"]), "application/pdf"))
                     subject = ev.get("title", "Insights Report")
-                    success = send_email(
+                    success, err = send_email(
                         ev.get("emails", []), subject, ev.get("insights", ""), attachments
                     )
                     if success:
                         logger.info("Sent scheduled email to %s", ev.get("emails", []))
                     else:
-                        logger.error("Failed to send scheduled email to %s", ev.get("emails", []))
+                        logger.error(
+                            "Failed to send scheduled email to %s: %s",
+                            ev.get("emails", []),
+                            err,
+                        )
                     db.child("users").child(uid).child("scheduled_emails").child(key).remove(TOKEN)
     except Exception as e:
         logger.exception("Scheduler error: %s", e)
