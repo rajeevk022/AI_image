@@ -23,6 +23,11 @@ Set the following variables before starting the app:
 - `RZP_SECRET` – secret for the Razorpay order server.
 - `RZP_WEBHOOK_SECRET` – webhook verification secret used by the server.
 - `PRO_PRICE` – cost of the Pro subscription in rupees (default **1** for testing).
+- `SMTP_SERVER` – hostname of your SMTP server.
+- `SMTP_PORT` – port for SMTP (default **587**).
+- `SMTP_USER` – username for SMTP authentication.
+- `SMTP_PASSWORD` – password for SMTP authentication.
+- `SMTP_SSL` – set to `1` to use SMTPS (optional).
 
 ## Running Locally
 

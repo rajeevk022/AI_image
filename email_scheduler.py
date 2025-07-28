@@ -2,6 +2,11 @@ import time, os, base64
 from firebase_config import firebase_config
 import pyrebase
 from app import send_email
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 firebase = pyrebase.initialize_app(firebase_config)
 auth, db = firebase.auth(), firebase.database()
@@ -23,8 +28,14 @@ while True:
                     if ev.get("pdf"):
                         attachments.append(("report.pdf", base64.b64decode(ev["pdf"]), "application/pdf"))
                     subject = ev.get("title", "Insights Report")
-                    send_email(ev.get("emails", []), subject, ev.get("insights", ""), attachments)
+                    success = send_email(
+                        ev.get("emails", []), subject, ev.get("insights", ""), attachments
+                    )
+                    if success:
+                        logger.info("Sent scheduled email to %s", ev.get("emails", []))
+                    else:
+                        logger.error("Failed to send scheduled email to %s", ev.get("emails", []))
                     db.child("users").child(uid).child("scheduled_emails").child(key).remove(TOKEN)
     except Exception as e:
-        print("Scheduler error", e)
+        logger.exception("Scheduler error: %s", e)
     time.sleep(60)
