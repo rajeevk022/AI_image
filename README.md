@@ -29,6 +29,10 @@ Set the following variables before starting the app:
 - `SMTP_PASSWORD` – password for SMTP authentication.
 - `SMTP_SSL` – set to `1` to use SMTPS (optional).
 
+These variables can be set as normal environment variables or placed in a
+`.env` file in the project root. The email utility automatically loads this file
+when needed so missing values won't cause errors if the file is present.
+
 Example `.env` section for sending mail via Gmail:
 
 ```env
