@@ -29,6 +29,9 @@ Set the following variables before starting the app:
 - `SMTP_PASSWORD` – password for SMTP authentication.
 - `SMTP_SSL` – set to `1` to use SMTPS (optional).
 
+You can place these values in a `.env` file in the project root. Both the
+Streamlit app and the background email scheduler load this file automatically.
+
 Email recipients entered in the UI must be valid addresses. Invalid addresses
 will be highlighted before sending or scheduling.
 
@@ -51,6 +54,8 @@ To deliver scheduled emails, run the background scheduler in another process:
 ```bash
 python email_scheduler.py
 ```
+The scheduler requires a Firebase authentication token. Set it in the environment
+as `FIREBASE_TOKEN` (or add it to `.env`).
 
 ## UID Based Storage
 

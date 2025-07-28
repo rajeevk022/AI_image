@@ -3,6 +3,9 @@ from firebase_config import firebase_config
 import pyrebase
 from app import send_email
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -11,7 +14,7 @@ logger = logging.getLogger(__name__)
 firebase = pyrebase.initialize_app(firebase_config)
 auth, db = firebase.auth(), firebase.database()
 
-# Expect EMAIL_SCHEDULER_TOKEN env for authentication
+# Expect FIREBASE_TOKEN env for authentication
 TOKEN = os.getenv("FIREBASE_TOKEN")
 
 while True:
