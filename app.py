@@ -9,7 +9,7 @@ AI Report Analyzer – full production build (May 2025)
 • Razorpay Checkout inline (650 px iframe)
 """
 
-import os, time, tempfile, requests, streamlit as st, threading, base64
+import os, time, tempfile, requests, streamlit as st, threading, base64, re
 import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, numpy as np, fitz, openai, pyrebase
 import traceback, sys
 from io import BytesIO
@@ -622,6 +622,14 @@ def export_pdf(insights, paths):
     return BytesIO(pdf.output(dest="S").encode("latin-1"))
 
 # ----------------------------------------------------------------------
+# Basic email validation regex
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def _invalid_emails(emails: list[str]) -> list[str]:
+    """Return any email addresses that do not match ``EMAIL_PATTERN``."""
+    return [e for e in emails if not EMAIL_PATTERN.fullmatch(e)]
+
+# ----------------------------------------------------------------------
 def send_email(
     to_addrs, subject: str, body: str, attachments: list[tuple[str, bytes, str]]
 ) -> tuple[bool, str | None]:
@@ -634,14 +642,25 @@ def send_email(
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER")
     pwd = os.getenv("SMTP_PASSWORD")
-    if not (server and user and pwd and to_addrs):
-        err = "Missing SMTP configuration or recipients"
-        logger.error(
-            err + ": server=%s user=%s to=%s",
-            server,
-            user,
-            to_addrs,
-        )
+
+    if isinstance(to_addrs, str):
+        to_addrs = [to_addrs]
+    to_addrs = [e for e in to_addrs if e]
+
+    if not to_addrs:
+        err = "No recipients provided"
+        logger.error(err)
+        return False, err
+
+    bad = _invalid_emails(to_addrs)
+    if bad:
+        err = "Invalid email address: " + ", ".join(bad)
+        logger.error(err)
+        return False, err
+
+    if not (server and user and pwd):
+        err = "Missing SMTP configuration"
+        logger.error(err + ": server=%s user=%s", server, user)
         return False, err
 
     from email.message import EmailMessage
@@ -650,8 +669,6 @@ def send_email(
     msg = EmailMessage()
     msg["Subject"] = subject or "Report"
     msg["From"] = user
-    if isinstance(to_addrs, str):
-        to_addrs = [to_addrs]
     msg["To"] = ", ".join(to_addrs)
     msg.set_content(body or "No significant insights")
 
@@ -701,6 +718,11 @@ def schedule_email(to_addrs: list[str], insights: str, csv: bytes, pdf: bytes, w
     """Persist an email schedule in the database for background delivery."""
     uid = get_current_uid()
     if not uid:
+        return
+
+    bad = _invalid_emails(to_addrs)
+    if bad:
+        st.error("Invalid email address: " + ", ".join(bad))
         return
 
     token = S.get("token")
@@ -1364,30 +1386,38 @@ def custom_insights_page():
         tz_idx = tz_names.index(local_tz) if local_tz in tz_names else tz_names.index("UTC")
         tz_choice = st.selectbox("Timezone", tz_names, index=tz_idx)
         if st.button("Schedule Email") and to_email and S["custom_chart_paths"]:
-            local_zone = ZoneInfo(tz_choice)
-            when_local = datetime.combine(datetime.now(local_zone).date(), send_time, tzinfo=local_zone)
-            when = when_local.astimezone(timezone.utc)
             emails = [e.strip() for e in to_email.split(',') if e.strip()]
-            csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
-            pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
-            schedule_email(emails, S["custom_insights"], csv_data, pdf_data, when, tz_choice)
+            bad = _invalid_emails(emails)
+            if bad:
+                st.error("Invalid email address: " + ", ".join(bad))
+            else:
+                local_zone = ZoneInfo(tz_choice)
+                when_local = datetime.combine(datetime.now(local_zone).date(), send_time, tzinfo=local_zone)
+                when = when_local.astimezone(timezone.utc)
+                csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
+                pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
+                schedule_email(emails, S["custom_insights"], csv_data, pdf_data, when, tz_choice)
 
         if st.button("Send Email Now") and to_email and S["custom_chart_paths"]:
             emails = [e.strip() for e in to_email.split(',') if e.strip()]
-            csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
-            pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
-            subject = generate_insight_title(S["custom_insights"])
-            attachments = [
-                ("report.csv", csv_data, "text/csv"),
-                ("report.pdf", pdf_data, "application/pdf"),
-            ]
-            success, err = send_email(
-                emails, subject, S["custom_insights"], attachments
-            )
-            if success:
-                st.success("Email sent")
+            bad = _invalid_emails(emails)
+            if bad:
+                st.error("Invalid email address: " + ", ".join(bad))
             else:
-                st.error(f"Failed to send email: {err}")
+                csv_data = S["df"].to_csv(index=False).encode() if not S["df"].empty else b""
+                pdf_data = export_pdf(S["custom_insights"], S["custom_chart_paths"]).read()
+                subject = generate_insight_title(S["custom_insights"])
+                attachments = [
+                    ("report.csv", csv_data, "text/csv"),
+                    ("report.pdf", pdf_data, "application/pdf"),
+                ]
+                success, err = send_email(
+                    emails, subject, S["custom_insights"], attachments
+                )
+                if success:
+                    st.success("Email sent")
+                else:
+                    st.error(f"Failed to send email: {err}")
 
     if st.button("Back", key="back_btn"):
         S["page"] = "dash"
