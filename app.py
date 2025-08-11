@@ -9,7 +9,7 @@ AI Report Analyzer – full production build (May 2025)
 • Razorpay Checkout inline (650 px iframe)
 """
 
-import os, time, tempfile, requests, streamlit as st, threading, base64, re
+import os, time, tempfile, requests, streamlit as st, threading, base64
 import pandas as pd, matplotlib.pyplot as plt, seaborn as sns, numpy as np, fitz, openai, pyrebase
 import traceback, sys
 from io import BytesIO
@@ -18,6 +18,7 @@ from datetime import datetime, timezone   # ← missing import added
 from zoneinfo import ZoneInfo, available_timezones
 # ────────────────────────────────────────────────────────────────────────
 from firebase_config import firebase_config
+from mailer import send_email, invalid_emails
 import logging
 
 logging.basicConfig(level=logging.INFO,
@@ -622,98 +623,6 @@ def export_pdf(insights, paths):
     return BytesIO(pdf.output(dest="S").encode("latin-1"))
 
 # ----------------------------------------------------------------------
-# Basic email validation regex
-EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-def _invalid_emails(emails: list[str]) -> list[str]:
-    """Return any email addresses that do not match ``EMAIL_PATTERN``."""
-    return [e for e in emails if not EMAIL_PATTERN.fullmatch(e)]
-
-# ----------------------------------------------------------------------
-def send_email(
-    to_addrs, subject: str, body: str, attachments: list[tuple[str, bytes, str]]
-) -> tuple[bool, str | None]:
-    """Send an email with arbitrary attachments via SMTP.
-
-    Returns a tuple ``(success, error_message)`` so callers can surface the
-    specific reason when sending fails.
-    """
-    server = os.getenv("SMTP_SERVER")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER")
-    pwd = os.getenv("SMTP_PASSWORD")
-
-    # Load variables from a .env file if they weren't set already. This allows
-    # ``send_email`` to be imported in isolation without the rest of ``app``
-    # having run ``load_dotenv()`` beforehand.
-    if not (server and user and pwd):
-        load_dotenv()
-        server = server or os.getenv("SMTP_SERVER")
-        user = user or os.getenv("SMTP_USER")
-        pwd = pwd or os.getenv("SMTP_PASSWORD")
-
-    if isinstance(to_addrs, str):
-        to_addrs = [to_addrs]
-    to_addrs = [e for e in to_addrs if e]
-
-    if not to_addrs:
-        err = "No recipients provided"
-        logger.error(err)
-        return False, err
-
-    bad = _invalid_emails(to_addrs)
-    if bad:
-        err = "Invalid email address: " + ", ".join(bad)
-        logger.error(err)
-        return False, err
-
-    if not (server and user and pwd):
-        missing = []
-        if not server:
-            missing.append("SMTP_SERVER")
-        if not user:
-            missing.append("SMTP_USER")
-        if not pwd:
-            missing.append("SMTP_PASSWORD")
-        err = "Missing SMTP configuration: " + ", ".join(missing)
-        logger.error(err + ": server=%s user=%s", server, user)
-        return False, err
-
-    from email.message import EmailMessage
-    import smtplib
-
-    msg = EmailMessage()
-    msg["Subject"] = subject or "Report"
-    msg["From"] = user
-    msg["To"] = ", ".join(to_addrs)
-    msg.set_content(body or "No significant insights")
-
-    for name, data, mime in attachments:
-        try:
-            main, sub = mime.split("/", 1)
-            msg.add_attachment(data, maintype=main, subtype=sub, filename=name)
-        except Exception:
-            continue
-
-    try:
-        use_ssl = os.getenv("SMTP_SSL", "0") == "1" or port == 465
-        if use_ssl:
-            with smtplib.SMTP_SSL(server, port) as s:
-                s.login(user, pwd)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(server, port) as s:
-                s.starttls()
-                s.login(user, pwd)
-                s.send_message(msg)
-        return True, None
-    except Exception as e:
-        logger.exception(
-            "Failed to send email via %s:%s as %s", server, port, user
-        )
-        return False, str(e)
-
-
 def generate_insight_title(text: str) -> str:
     """Return a short formal title for the given insights using OpenAI."""
     prompt = (
@@ -736,7 +645,7 @@ def schedule_email(to_addrs: list[str], insights: str, csv: bytes, pdf: bytes, w
     if not uid:
         return
 
-    bad = _invalid_emails(to_addrs)
+    bad = invalid_emails(to_addrs)
     if bad:
         st.error("Invalid email address: " + ", ".join(bad))
         return
@@ -1403,7 +1312,7 @@ def custom_insights_page():
         tz_choice = st.selectbox("Timezone", tz_names, index=tz_idx)
         if st.button("Schedule Email") and to_email and S["custom_chart_paths"]:
             emails = [e.strip() for e in to_email.split(',') if e.strip()]
-            bad = _invalid_emails(emails)
+            bad = invalid_emails(emails)
             if bad:
                 st.error("Invalid email address: " + ", ".join(bad))
             else:
@@ -1416,7 +1325,7 @@ def custom_insights_page():
 
         if st.button("Send Email Now") and to_email and S["custom_chart_paths"]:
             emails = [e.strip() for e in to_email.split(',') if e.strip()]
-            bad = _invalid_emails(emails)
+            bad = invalid_emails(emails)
             if bad:
                 st.error("Invalid email address: " + ", ".join(bad))
             else:
